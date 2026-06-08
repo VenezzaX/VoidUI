@@ -405,9 +405,10 @@ function VoidLib:CreateWindow(title, version)
         end
         for i, btn in ipairs(Win._tabBtns) do
             local active = (i == idx)
-            tw(btn, { BackgroundColor3 = active and T.AccentMuted or T.Sidebar })
+            tw(btn, { BackgroundColor3 = active and T.BG or T.Sidebar })
             btn.TextColor3 = active and T.White or T.TextDim
-            tw(Win._tabAccents[i], { BackgroundColor3 = active and T.Accent or T.Sidebar })
+            tw(Win._tabAccents[i], { Size = active and UDim2.new(0, 4, 1, 0) or UDim2.new(0, 0, 1, 0) })
+            Win._tabAccents[i].BackgroundColor3 = active and T.Accent or T.Sidebar
         end
     end
 
@@ -418,7 +419,7 @@ function VoidLib:CreateWindow(title, version)
         -- Sidebar button
         local tabBtn = make("TextButton", {
             Text = "",
-            BackgroundColor3 = idx == 1 and T.AccentMuted or T.Sidebar,
+            BackgroundColor3 = idx == 1 and T.BG or T.Sidebar,
             BorderSizePixel = 0,
             Size = UDim2.new(1, 0, 0, 40),
             LayoutOrder = idx,
@@ -427,7 +428,7 @@ function VoidLib:CreateWindow(title, version)
 
         -- Left accent bar
         local accentBar = make("Frame", {
-            Size = UDim2.new(0, 3, 1, 0),
+            Size = UDim2.new(0, idx == 1 and 4 or 0, 1, 0),
             BackgroundColor3 = idx == 1 and T.Accent or T.Sidebar,
             BorderSizePixel = 0,
             ZIndex = 3,
@@ -462,7 +463,7 @@ function VoidLib:CreateWindow(title, version)
         end)
         tabBtn.MouseLeave:Connect(function()
             -- revert only if not active
-            local isActive = (tabBtn.BackgroundColor3 == T.AccentMuted)
+            local isActive = (tabBtn.BackgroundColor3 == T.BG)
             if not isActive then
                 tw(tabBtn, { BackgroundColor3 = T.Sidebar })
             end
@@ -549,21 +550,25 @@ function VoidLib:CreateWindow(title, version)
                 TextXAlignment = Enum.TextXAlignment.Left,
             }, row)
 
-            -- Toggle pill
-            local pill = make("Frame", {
-                Size = UDim2.new(0, 44, 0, 20),
-                Position = UDim2.new(1, -56, 0.5, -10),
-                BackgroundColor3 = state and T.OnColor or T.OffColor,
+            -- Toggle Checkbox
+            local box = make("Frame", {
+                Size = UDim2.new(0, 16, 0, 16),
+                Position = UDim2.new(1, -28, 0.5, -8),
+                BackgroundColor3 = state and T.Accent or T.OffColor,
                 BorderSizePixel = 0,
             }, row)
-            mkStroke(pill, T.Border, 1)
+            mkStroke(box, T.Border, 1)
 
-            local knob = make("Frame", {
-                Size = UDim2.new(0, 14, 0, 14),
-                Position = state and UDim2.new(1,-17,0.5,-7) or UDim2.new(0,3,0.5,-7),
-                BackgroundColor3 = T.White,
-                BorderSizePixel = 0,
-            }, pill)
+            local checkmark = make("TextLabel", {
+                Text = state and "✕" or "",
+                TextSize = 10,
+                Font = Enum.Font.GothamBold,
+                TextColor3 = T.White,
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 1, 0),
+                TextXAlignment = Enum.TextXAlignment.Center,
+                TextYAlignment = Enum.TextYAlignment.Center,
+            }, box)
 
             local hitbox = make("TextButton", {
                 Text = "", BackgroundTransparency = 1,
@@ -574,8 +579,8 @@ function VoidLib:CreateWindow(title, version)
 
             local function applyToggle(v)
                 Toggle.Value = v
-                tw(pill,  { BackgroundColor3 = v and T.OnColor or T.OffColor })
-                tw(knob,  { Position = v and UDim2.new(1,-17,0.5,-7) or UDim2.new(0,3,0.5,-7) })
+                tw(box, { BackgroundColor3 = v and T.Accent or T.OffColor })
+                checkmark.Text = v and "✕" or ""
                 tw(strip, { BackgroundColor3 = v and T.Accent or T.Border })
             end
 
@@ -583,7 +588,6 @@ function VoidLib:CreateWindow(title, version)
                 applyToggle(v)
                 if callback then callback(v) end
             end
-            -- backward compat alias
             Toggle.SetValue = Toggle.Set
 
             hitbox.MouseButton1Click:Connect(function()
@@ -637,11 +641,12 @@ function VoidLib:CreateWindow(title, version)
             }, row)
 
             local track = make("Frame", {
-                Size = UDim2.new(1, -24, 0, 3),
-                Position = UDim2.new(0, 12, 0, 36),
+                Size = UDim2.new(1, -24, 0, 8), -- Thicker panel track!
+                Position = UDim2.new(0, 12, 0, 34),
                 BackgroundColor3 = T.TrackBG,
                 BorderSizePixel = 0,
             }, row)
+            mkStroke(track, T.Border, 1)
 
             local p0 = (val - minV) / math.max(maxV - minV, 1)
             local fill = make("Frame", {
@@ -650,13 +655,14 @@ function VoidLib:CreateWindow(title, version)
                 BorderSizePixel = 0,
             }, track)
 
-            local thumb = make("Frame", {
-                Size = UDim2.new(0, 11, 0, 11),
-                Position = UDim2.new(p0, -6, 0.5, -6),
+            local marker = make("Frame", {
+                Size = UDim2.new(0, 4, 1.6, 0),
+                Position = UDim2.new(p0, -2, -0.3, 0),
                 BackgroundColor3 = T.White,
                 BorderSizePixel = 0,
+                ZIndex = 2,
             }, track)
-            mkStroke(thumb, T.Accent, 1)
+            mkStroke(marker, T.Border, 1)
 
             local Slider = { Value = val }
             local draggingSlider = false
@@ -669,7 +675,7 @@ function VoidLib:CreateWindow(title, version)
                 Slider.Value = v
                 valLbl.Text = tostring(v)
                 fill.Size = UDim2.new(p, 0, 1, 0)
-                thumb.Position = UDim2.new(p, -6, 0.5, -6)
+                marker.Position = UDim2.new(p, -2, -0.3, 0)
                 if callback then callback(v) end
             end
 
@@ -679,7 +685,7 @@ function VoidLib:CreateWindow(title, version)
                 self.Value = val
                 valLbl.Text = tostring(val)
                 fill.Size = UDim2.new(p, 0, 1, 0)
-                thumb.Position = UDim2.new(p, -6, 0.5, -6)
+                marker.Position = UDim2.new(p, -2, -0.3, 0)
             end
             Slider.SetValue = Slider.Set
 
