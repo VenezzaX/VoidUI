@@ -135,8 +135,8 @@ function VoidLib:CreateWindow(title, version)
         CoreGui:FindFirstChild("VoidLib_" .. title):Destroy()
     end
 
-    local WIN_W   = 610
-    local WIN_H   = 455
+    local WIN_W   = 660
+    local WIN_H   = 490
     local TITLE_H = 42
     local SIDE_W  = 128
 
