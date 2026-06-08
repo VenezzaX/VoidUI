@@ -754,113 +754,220 @@ function VoidLib:CreateWindow(title, version)
             return Btn
         end
 
-        -- ── DROPDOWN ────────────────────────────────────────
-        function Tab:AddDropdown(label, options, defaultIdx, callback)
-            local selected = defaultIdx or 1
-            local open = false
+-- DROPDOWN
+function Tab:AddDropdown(label, options, defaultIdx, callback)
+    options = typeof(options) == "table" and options or {}
+    if #options == 0 then
+        options = {"..."}
+    end
 
-            local row = make("Frame", {
-                Size = UDim2.new(1, 0, 0, 38),
-                BackgroundColor3 = T.PanelAlt,
-                BorderSizePixel = 0,
-                ClipsDescendants = false,
-                ZIndex = 5,
-            }, scroll)
-            mkStroke(row, T.Border, 1)
+    local selected = math.clamp(defaultIdx or 1, 1, #options)
+    local open = false
 
-            make("TextLabel", {
-                Text = label,
-                TextSize = 12, Font = Enum.Font.GothamBold,
-                TextColor3 = T.Text, BackgroundTransparency = 1,
-                Position = UDim2.new(0, 12, 0, 0),
-                Size = UDim2.new(0.52, 0, 1, 0),
-                TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5,
-            }, row)
+    local row = make("Frame", {
+        Size = UDim2.new(1, 0, 0, 38),
+        BackgroundColor3 = T.PanelAlt,
+        BorderSizePixel = 0,
+        ClipsDescendants = false,
+        ZIndex = 5,
+    }, scroll)
+    mkStroke(row, T.Border, 1)
 
-            local selLbl = make("TextLabel", {
-                Text = options[selected] or "...",
-                TextSize = 11, Font = Enum.Font.Gotham,
-                TextColor3 = T.Accent, BackgroundTransparency = 1,
-                Position = UDim2.new(0.52, 0, 0, 0),
-                Size = UDim2.new(0.4, 0, 1, 0),
-                TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 5,
-            }, row)
+    make("TextLabel", {
+        Text = label,
+        TextSize = 12,
+        Font = Enum.Font.GothamBold,
+        TextColor3 = T.Text,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 12, 0, 0),
+        Size = UDim2.new(0.52, 0, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 5,
+    }, row)
 
-            local arrow = make("TextLabel", {
-                Text = "▾", TextSize = 14, Font = Enum.Font.GothamBold,
-                TextColor3 = T.TextDim, BackgroundTransparency = 1,
-                Position = UDim2.new(1, -22, 0, 0),
-                Size = UDim2.new(0, 18, 1, 0),
-                TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 5,
-            }, row)
+    local selLbl = make("TextLabel", {
+        Text = tostring(options[selected] or "..."),
+        TextSize = 11,
+        Font = Enum.Font.Gotham,
+        TextColor3 = T.Accent,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0.52, 0, 0, 0),
+        Size = UDim2.new(0.4, 0, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Right,
+        ZIndex = 5,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+    }, row)
 
-            local ddFrame = make("Frame", {
-                Size = UDim2.new(1, 0, 0, math.min(#options, 5) * 28),
-                Position = UDim2.new(0, 0, 1, 2),
-                BackgroundColor3 = T.Panel, BorderSizePixel = 0,
-                Visible = false, ZIndex = 20, ClipsDescendants = true,
-            }, row)
-            mkStroke(ddFrame, T.Accent, 1)
+    local arrow = make("TextLabel", {
+        Text = "▼",
+        TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        TextColor3 = T.TextDim,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(1, -22, 0, 0),
+        Size = UDim2.new(0, 18, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Center,
+        ZIndex = 5,
+    }, row)
 
-            local ddScroll = make("ScrollingFrame", {
-                Size = UDim2.new(1, 0, 1, 0),
-                BackgroundTransparency = 1, BorderSizePixel = 0,
-                ScrollBarThickness = 2, ScrollBarImageColor3 = T.Accent,
-                CanvasSize = UDim2.new(0, 0, 0, 0),
-                AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 20,
-            }, ddFrame)
-            mkList(ddScroll, nil, 0)
+    local ddFrame = make("Frame", {
+        Size = UDim2.new(1, 0, 0, 0),
+        Position = UDim2.new(0, 0, 1, 2),
+        BackgroundColor3 = T.Panel,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = 20,
+        ClipsDescendants = true,
+    }, row)
+    mkStroke(ddFrame, T.Accent, 1)
 
-            local DD = { Value = options[selected], Index = selected }
+    local ddScroll = make("ScrollingFrame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 2,
+        ScrollBarImageColor3 = T.Accent,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        AutomaticCanvasSize = Enum.AutomaticSize.None,
+        ScrollingDirection = Enum.ScrollingDirection.Y,
+        ElasticBehavior = Enum.ElasticBehavior.Never,
+        ZIndex = 20,
+    }, ddFrame)
+    local ddList = mkList(ddScroll, nil, 0)
 
-            local function buildOpts(opts)
-                for _, c in ipairs(ddScroll:GetChildren()) do
-                    if c:IsA("TextButton") then c:Destroy() end
-                end
-                for i, opt in ipairs(opts) do
-                    local item = make("TextButton", {
-                        Text = "  " .. opt, TextSize = 11, Font = Enum.Font.Gotham,
-                        TextColor3 = T.Text,
-                        BackgroundColor3 = i == selected and T.AccentDim or T.Panel,
-                        BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 28),
-                        TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 21,
-                    }, ddScroll)
-                    local ci = i
-                    item.MouseButton1Click:Connect(function()
-                        selected = ci; DD.Value = opt; DD.Index = ci
-                        selLbl.Text = opt; open = false
-                        ddFrame.Visible = false; arrow.Text = "▾"
-                        if callback then callback(ci, opt) end
-                    end)
-                    item.MouseEnter:Connect(function() tw(item, { BackgroundColor3 = T.AccentDim }) end)
-                    item.MouseLeave:Connect(function()
-                        tw(item, { BackgroundColor3 = ci == selected and T.AccentDim or T.Panel })
-                    end)
-                end
-            end
+    local DD = {
+        Value = options[selected],
+        Index = selected
+    }
 
-            buildOpts(options)
+    local function getDropdownHeight(count)
+        return math.min(count, 5) * 28
+    end
 
-            function DD:SetOptions(opts)
-                options = opts; selected = 1
-                self.Value = opts[1]; self.Index = 1
-                selLbl.Text = opts[1] or "..."
-                buildOpts(opts)
-            end
+    local function syncCanvas()
+        task.defer(function()
+            local y = ddList.AbsoluteContentSize.Y
+            ddScroll.CanvasSize = UDim2.new(0, 0, 0, y)
+        end)
+    end
 
-            local hit = make("TextButton", {
-                Text = "", BackgroundTransparency = 1,
-                Size = UDim2.new(1, 0, 1, 0), ZIndex = 6,
-            }, row)
-            hit.MouseButton1Click:Connect(function()
-                open = not open; ddFrame.Visible = open
-                arrow.Text = open and "▴" or "▾"
-            end)
-            row.MouseEnter:Connect(function() tw(row, { BackgroundColor3 = T.Hover    }) end)
-            row.MouseLeave:Connect(function() tw(row, { BackgroundColor3 = T.PanelAlt }) end)
-
-            return DD
+    local function applySelection(index, fireCallback)
+        if #options == 0 then
+            selected = 1
+            DD.Index = 1
+            DD.Value = "..."
+            selLbl.Text = "..."
+            return
         end
+
+        selected = math.clamp(index or 1, 1, #options)
+        DD.Index = selected
+        DD.Value = options[selected]
+        selLbl.Text = tostring(DD.Value or "...")
+        for _, c in ipairs(ddScroll:GetChildren()) do
+            if c:IsA("TextButton") then
+                local ci = c:GetAttribute("OptionIndex")
+                c.BackgroundColor3 = (ci == selected) and T.AccentDim or T.Panel
+            end
+        end
+
+        if fireCallback and callback then
+            callback(selected, DD.Value)
+        end
+    end
+
+    local function rebuildOptions()
+        for _, c in ipairs(ddScroll:GetChildren()) do
+            if c:IsA("TextButton") then
+                c:Destroy()
+            end
+        end
+
+        local visibleHeight = getDropdownHeight(#options)
+        ddFrame.Size = UDim2.new(1, 0, 0, visibleHeight)
+
+        for i, opt in ipairs(options) do
+            local item = make("TextButton", {
+                Text = "  " .. tostring(opt),
+                TextSize = 11,
+                Font = Enum.Font.Gotham,
+                TextColor3 = T.Text,
+                BackgroundColor3 = (i == selected) and T.AccentDim or T.Panel,
+                BorderSizePixel = 0,
+                Size = UDim2.new(1, 0, 0, 28),
+                TextXAlignment = Enum.TextXAlignment.Left,
+                ZIndex = 21,
+            }, ddScroll)
+
+            item:SetAttribute("OptionIndex", i)
+
+            item.MouseButton1Click:Connect(function()
+                applySelection(i, true)
+                open = false
+                ddFrame.Visible = false
+                arrow.Text = "▼"
+            end)
+
+            item.MouseEnter:Connect(function()
+                tw(item, {BackgroundColor3 = T.AccentDim})
+            end)
+
+            item.MouseLeave:Connect(function()
+                local isSelected = item:GetAttribute("OptionIndex") == selected
+                tw(item, {BackgroundColor3 = isSelected and T.AccentDim or T.Panel})
+            end)
+        end
+
+        syncCanvas()
+        applySelection(selected, false)
+    end
+
+    function DD:SetOptions(opts)
+        local oldValue = self.Value
+        options = typeof(opts) == "table" and opts or {}
+
+        if #options == 0 then
+            options = {"..."}
+        end
+
+        local newIndex = table.find(options, oldValue) or 1
+        selected = math.clamp(newIndex, 1, #options)
+
+        rebuildOptions()
+
+        open = false
+        ddFrame.Visible = false
+        arrow.Text = "▼"
+    end
+
+    rebuildOptions()
+
+    local hit = make("TextButton", {
+        Text = "",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, 0),
+        ZIndex = 6,
+    }, row)
+
+    hit.MouseButton1Click:Connect(function()
+        open = not open
+        ddFrame.Visible = open
+        arrow.Text = open and "▲" or "▼"
+        if open then
+            syncCanvas()
+        end
+    end)
+
+    row.MouseEnter:Connect(function()
+        tw(row, {BackgroundColor3 = T.Hover})
+    end)
+
+    row.MouseLeave:Connect(function()
+        tw(row, {BackgroundColor3 = T.PanelAlt})
+    end)
+
+    return DD
+end
 
         -- ── KEYBIND ─────────────────────────────────────────
         function Tab:AddKeybind(label, defaultKey, callback)
