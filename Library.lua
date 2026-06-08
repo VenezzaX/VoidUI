@@ -1,326 +1,395 @@
 --[[
     ╔═══════════════════════════════════════════════════════════╗
-    ║               VOID LIBRARY  v2.1                          ║
+    ║                  VOID LIBRARY  v2.0                       ║
     ║       Standalone Roblox Luau UI Framework                 ║
-    ║       Black · Blocky · Sidebar Admin Panel                ║
+    ║       Black · Blocky · Sidebar · Modern Admin Panel       ║
     ╚═══════════════════════════════════════════════════════════╝
 
-    FULL API:
-        VoidLib:CreateWindow(title, version)       → Win
-        Win:AddTab(name)                           → Tab
-        Win:Toast(msg, color)
-        Win:Destroy()
-        Win.HUDLabel                               TextLabel
+    API REFERENCE:
+        VoidLib:CreateWindow(title, version)       → Window
+        Window:AddTab(name)                        → Tab
+        Window:Toast(msg, color)
+        Window:Destroy()
+        Window.HUDLabel                            TextLabel ref
 
         Tab:AddSection(label)
-        Tab:AddToggle(label, default, cb)          → { Value, Set(v) }
-        Tab:AddSlider(label, min, max, def, cb)    → { Value, Set(v) }
-        Tab:AddButton(label, btnText, cb)          → { SetLabel(t) }
-        Tab:AddDropdown(label, opts, def, cb)      → { Value, Index, SetOptions(t) }
-        Tab:AddKeybind(label, defaultKey, cb)      → { Key, Set(k) }
-        Tab:AddInfoRow(label, value)               → { SetValue(v), SetColor(c) }
-        Tab:AddTextInput(placeholder, btnText, cb) → { GetText(), SetText(t), Clear() }
-        Tab:AddPlayerList(b1, c1 [,b2, c2])        → { Refresh() }
-        Tab:AddScrollFeed(height)                  → { AddEntry(t,c), Clear() }
-        Tab:AddFrame(height)                       → Frame
+        Tab:AddToggle(label, default, cb)          → Toggle  (.Value, :Set(v))
+        Tab:AddSlider(label, min, max, def, cb)    → Slider  (.Value, :Set(v))
+        Tab:AddButton(label, subLabel, cb)         → Button  (:SetLabel(t))
+        Tab:AddDropdown(label, opts, def, cb)      → Dropdown(.Value, .Index, :SetOptions(t))
+        Tab:AddKeybind(label, defaultKey, cb)      → Keybind (.Key, :Set(key))
+        Tab:AddInfoRow(label, value)               → InfoRow (:SetValue(v), :SetColor(c))
+        Tab:AddTextInput(placeholder, btnTxt, cb)  → TextInput(:GetText(), :Clear())
+        Tab:AddPlayerList(btn1, cb1, btn2, cb2)    → PlayerList(:Refresh())  [btn2/cb2 optional]
+        Tab:AddScrollFeed(height)                  → Feed (:AddEntry(t,c), :Clear())
+        Tab:AddRawFrame(height)                    → Frame
 ]]
 
--- ────────────────────────────────────────────────────────
+-- ────────────────────────────────────────────────────────────
 --  SERVICES
--- ────────────────────────────────────────────────────────
+-- ────────────────────────────────────────────────────────────
 local TweenService     = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Players          = game:GetService("Players")
 local CoreGui          = game:GetService("CoreGui")
 local LP               = Players.LocalPlayer
 
--- ────────────────────────────────────────────────────────
+-- ────────────────────────────────────────────────────────────
 --  THEME
--- ────────────────────────────────────────────────────────
-local C = {
-    BG         = Color3.fromRGB(6,   6,   6),
-    Sidebar    = Color3.fromRGB(11,  11,  11),
-    Panel      = Color3.fromRGB(15,  15,  15),
-    Row        = Color3.fromRGB(19,  19,  19),
-    Hover      = Color3.fromRGB(27,  27,  27),
-    Border     = Color3.fromRGB(34,  34,  34),
-    BorderHi   = Color3.fromRGB(52,  52,  52),
-    Accent     = Color3.fromRGB(218, 38,  38),
-    AccentDim  = Color3.fromRGB(130, 20,  20),
-    AccentGlow = Color3.fromRGB(255, 75,  75),
-    AccentBG   = Color3.fromRGB(45,  10,  10),
-    Text       = Color3.fromRGB(232, 232, 232),
-    TextSub    = Color3.fromRGB(120, 120, 120),
-    TextMuted  = Color3.fromRGB(58,  58,  58),
-    White      = Color3.fromRGB(255, 255, 255),
-    Green      = Color3.fromRGB(50,  195, 75),
-    Yellow     = Color3.fromRGB(218, 170, 42),
-    Red        = Color3.fromRGB(218, 38,  38),
-    Track      = Color3.fromRGB(28,  28,  28),
-    On         = Color3.fromRGB(218, 38,  38),
-    Off        = Color3.fromRGB(32,  32,  32),
+-- ────────────────────────────────────────────────────────────
+local T = {
+    BG           = Color3.fromRGB(7,   7,   7),
+    Sidebar      = Color3.fromRGB(12,  12,  12),
+    Panel        = Color3.fromRGB(16,  16,  16),
+    PanelAlt     = Color3.fromRGB(20,  20,  20),
+    Hover        = Color3.fromRGB(28,  28,  28),
+    Border       = Color3.fromRGB(36,  36,  36),
+    BorderHi     = Color3.fromRGB(55,  55,  55),
+    Accent       = Color3.fromRGB(220, 40,  40),
+    AccentDim    = Color3.fromRGB(135, 22,  22),
+    AccentGlow   = Color3.fromRGB(255, 80,  80),
+    AccentMuted  = Color3.fromRGB(60,  14,  14),
+    Text         = Color3.fromRGB(235, 235, 235),
+    TextDim      = Color3.fromRGB(130, 130, 130),
+    TextMuted    = Color3.fromRGB(60,  60,  60),
+    White        = Color3.fromRGB(255, 255, 255),
+    Green        = Color3.fromRGB(55,  200, 80),
+    Yellow       = Color3.fromRGB(220, 175, 45),
+    OnColor      = Color3.fromRGB(220, 40,  40),
+    OffColor     = Color3.fromRGB(34,  34,  34),
+    TrackBG      = Color3.fromRGB(30,  30,  30),
+    BindColor    = Color3.fromRGB(28,  28,  28),
+    BindActive   = Color3.fromRGB(55,  14,  14),
 }
 
--- ────────────────────────────────────────────────────────
---  HELPERS
--- ────────────────────────────────────────────────────────
-local function anim(obj, goal, t, s, d)
-    TweenService:Create(obj,
-        TweenInfo.new(t or 0.13, s or Enum.EasingStyle.Quart, d or Enum.EasingDirection.Out),
-        goal):Play()
+-- ────────────────────────────────────────────────────────────
+--  INTERNALS
+-- ────────────────────────────────────────────────────────────
+local function tw(obj, props, t, style, dir)
+    TweenService:Create(
+        obj,
+        TweenInfo.new(t or 0.13, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out),
+        props
+    ):Play()
 end
 
-local function new(class, props, parent)
+local function make(class, props, parent)
     local o = Instance.new(class)
     for k, v in pairs(props or {}) do o[k] = v end
     if parent then o.Parent = parent end
     return o
 end
 
-local function outline(parent, color, thick)
+local function mkStroke(parent, color, thick)
     local s = Instance.new("UIStroke", parent)
-    s.Color = color or C.Border; s.Thickness = thick or 1
+    s.Color = color or T.Border; s.Thickness = thick or 1
     return s
 end
 
-local function padding(parent, t, b, l, r)
+local function mkPad(parent, t, b, l, r)
     local p = Instance.new("UIPadding", parent)
     p.PaddingTop    = UDim.new(0, t or 0)
     p.PaddingBottom = UDim.new(0, b or 0)
     p.PaddingLeft   = UDim.new(0, l or 0)
     p.PaddingRight  = UDim.new(0, r or 0)
+    return p
 end
 
-local function vList(parent, gap)
+local function mkList(parent, dir, gap, sort)
     local l = Instance.new("UIListLayout", parent)
-    l.FillDirection = Enum.FillDirection.Vertical
-    l.Padding = UDim.new(0, gap or 0)
-    l.SortOrder = Enum.SortOrder.LayoutOrder
+    l.FillDirection = dir or Enum.FillDirection.Vertical
+    l.Padding       = UDim.new(0, gap or 0)
+    l.SortOrder     = sort or Enum.SortOrder.LayoutOrder
     return l
 end
 
-local function hList(parent, gap)
-    local l = Instance.new("UIListLayout", parent)
-    l.FillDirection = Enum.FillDirection.Horizontal
-    l.Padding = UDim.new(0, gap or 0)
-    l.SortOrder = Enum.SortOrder.LayoutOrder
-    return l
-end
-
-local function scrollFrame(parent)
-    local sf = new("ScrollingFrame", {
+local function mkScroll(parent)
+    local sf = make("ScrollingFrame", {
         Size = UDim2.new(1,0,1,0),
-        BackgroundTransparency = 1, BorderSizePixel = 0,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
         ScrollBarThickness = 3,
-        ScrollBarImageColor3 = C.Accent,
+        ScrollBarImageColor3 = T.Accent,
         CanvasSize = UDim2.new(0,0,0,0),
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         ScrollingDirection = Enum.ScrollingDirection.Y,
         ElasticBehavior = Enum.ElasticBehavior.Never,
     }, parent)
-    vList(sf, 2)
-    padding(sf, 8, 10, 8, 8)
+    mkList(sf, nil, 2)
+    mkPad(sf, 8, 8, 8, 8)
     return sf
 end
 
--- Global: is a keybind currently being recorded?
-local _bindActive = false
+-- Listening flag for keybinds (prevents conflicts)
+local _listeningForBind = false
 
--- ════════════════════════════════════════════════════════
+-- ────────────────────────────────────────────────────────────
 --  LIBRARY
--- ════════════════════════════════════════════════════════
+-- ────────────────────────────────────────────────────────────
 local VoidLib = {}
 VoidLib.__index = VoidLib
 
 function VoidLib:CreateWindow(title, version)
-    if CoreGui:FindFirstChild("VL_" .. title) then
-        CoreGui:FindFirstChild("VL_" .. title):Destroy()
+    -- Remove existing
+    if CoreGui:FindFirstChild("VoidLib_" .. title) then
+        CoreGui:FindFirstChild("VoidLib_" .. title):Destroy()
     end
 
-    local W, H     = 620, 460
-    local TH       = 42   -- titlebar height
-    local SW       = 130  -- sidebar width
+    local WIN_W   = 610
+    local WIN_H   = 455
+    local TITLE_H = 42
+    local SIDE_W  = 128
 
-    -- Root
-    local gui = new("ScreenGui", {
-        Name = "VL_" .. title,
-        ResetOnSpawn = false,
+    -- ── Root GUI ────────────────────────────────────────────
+    local gui = make("ScreenGui", {
+        Name           = "VoidLib_" .. title,
+        ResetOnSpawn   = false,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
         IgnoreGuiInset = true,
     }, CoreGui)
 
-    -- Toast container (bottom right)
-    local toastHolder = new("Frame", {
-        Size = UDim2.new(0,278,0,500),
-        Position = UDim2.new(1,-288,1,-510),
-        BackgroundTransparency = 1, BorderSizePixel = 0,
+    -- ── Toast Container ─────────────────────────────────────
+    local toastBox = make("Frame", {
+        Name = "ToastContainer",
+        Size = UDim2.new(0, 275, 0, 480),
+        Position = UDim2.new(1, -285, 1, -500),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
     }, gui)
-    local tl = vList(toastHolder, 5)
-    tl.VerticalAlignment = Enum.VerticalAlignment.Bottom
+    local tcL = mkList(toastBox, nil, 5)
+    tcL.VerticalAlignment = Enum.VerticalAlignment.Bottom
 
-    -- Main window
-    local win = new("Frame", {
-        Name = "Win",
-        Size = UDim2.new(0,W,0,H),
-        Position = UDim2.new(0.5,-W/2,0.5,-H/2),
-        BackgroundColor3 = C.BG, BorderSizePixel = 0,
+    -- ── Main Window ─────────────────────────────────────────
+    local win = make("Frame", {
+        Name = "VoidWindow",
+        Size = UDim2.new(0, WIN_W, 0, WIN_H),
+        Position = UDim2.new(0.5, -WIN_W/2, 0.5, -WIN_H/2),
+        BackgroundColor3 = T.BG,
+        BorderSizePixel = 0,
         ClipsDescendants = true,
     }, gui)
-    outline(win, C.Border, 1)
+    mkStroke(win, T.Border, 1)
 
-    -- ── Titlebar ────────────────────────────────────────
-    local tb = new("Frame", {
-        Size = UDim2.new(1,0,0,TH),
-        BackgroundColor3 = C.Panel, BorderSizePixel = 0, ZIndex = 4,
+    -- ── Title Bar ───────────────────────────────────────────
+    local titleBar = make("Frame", {
+        Size = UDim2.new(1, 0, 0, TITLE_H),
+        BackgroundColor3 = T.Panel,
+        BorderSizePixel = 0,
+        ZIndex = 3,
     }, win)
-    outline(tb, C.Border, 1)
+    mkStroke(titleBar, T.Border, 1)
 
-    -- Accent stripe
-    new("Frame", { Size=UDim2.new(0,3,1,0), BackgroundColor3=C.Accent, BorderSizePixel=0, ZIndex=5 }, tb)
+    -- Left accent stripe
+    make("Frame", {
+        Size = UDim2.new(0, 3, 1, 0),
+        BackgroundColor3 = T.Accent,
+        BorderSizePixel = 0,
+        ZIndex = 4,
+    }, titleBar)
 
-    -- Logo dot
-    new("Frame", { Size=UDim2.new(0,7,0,7), Position=UDim2.new(0,13,0.5,-3.5),
-        BackgroundColor3=C.Accent, BorderSizePixel=0, ZIndex=5 }, tb)
+    -- Title dot
+    make("Frame", {
+        Size = UDim2.new(0, 6, 0, 6),
+        Position = UDim2.new(0, 14, 0.5, -3),
+        BackgroundColor3 = T.Accent,
+        BorderSizePixel = 0,
+        ZIndex = 4,
+    }, titleBar)
 
-    -- Title
-    new("TextLabel", { Text=title, TextSize=14, Font=Enum.Font.GothamBold,
-        TextColor3=C.White, BackgroundTransparency=1,
-        Position=UDim2.new(0,26,0,0), Size=UDim2.new(0,155,1,0),
-        TextXAlignment=Enum.TextXAlignment.Left, ZIndex=5 }, tb)
+    make("TextLabel", {
+        Text = title,
+        TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        TextColor3 = T.White,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 26, 0, 0),
+        Size = UDim2.new(0, 160, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 4,
+    }, titleBar)
 
-    -- Version
-    new("TextLabel", { Text=version or "", TextSize=9, Font=Enum.Font.Gotham,
-        TextColor3=C.TextMuted, BackgroundTransparency=1,
-        Position=UDim2.new(0,128,0,0), Size=UDim2.new(0,55,1,0),
-        TextXAlignment=Enum.TextXAlignment.Left, ZIndex=5 }, tb)
+    make("TextLabel", {
+        Text = version or "",
+        TextSize = 10,
+        Font = Enum.Font.Gotham,
+        TextColor3 = T.TextMuted,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 130, 0, 0),
+        Size = UDim2.new(0, 50, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 4,
+    }, titleBar)
 
-    -- HUD label (center)
-    local hudLbl = new("TextLabel", {
-        Name="HUDLabel", Text="FPS: --  |  PING: --ms",
-        TextSize=10, Font=Enum.Font.GothamBold,
-        TextColor3=C.TextSub, BackgroundTransparency=1,
-        Position=UDim2.new(0,188,0,0),
-        Size=UDim2.new(1,-290,1,0),
-        TextXAlignment=Enum.TextXAlignment.Center, ZIndex=5,
-    }, tb)
+    local hudLabel = make("TextLabel", {
+        Name = "HUDLabel",
+        Text = "FPS: --  |  PING: --ms",
+        TextSize = 10,
+        Font = Enum.Font.GothamBold,
+        TextColor3 = T.TextDim,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 190, 0, 0),
+        Size = UDim2.new(1, -290, 1, 0),
+        TextXAlignment = Enum.TextXAlignment.Center,
+        ZIndex = 4,
+    }, titleBar)
 
-    -- Window buttons
-    local minBtn = new("TextButton", {
-        Text="─", TextSize=12, Font=Enum.Font.GothamBold,
-        TextColor3=C.TextSub, BackgroundColor3=C.BG,
-        BorderSizePixel=0, Size=UDim2.new(0,30,0,22),
-        Position=UDim2.new(1,-68,0.5,-11), ZIndex=5,
-    }, tb)
-    outline(minBtn, C.Border, 1)
+    -- Minimize
+    local minBtn = make("TextButton", {
+        Text = "─",
+        TextSize = 13,
+        Font = Enum.Font.GothamBold,
+        TextColor3 = T.TextDim,
+        BackgroundColor3 = T.BG,
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, 32, 0, 22),
+        Position = UDim2.new(1, -70, 0.5, -11),
+        ZIndex = 4,
+    }, titleBar)
+    mkStroke(minBtn, T.Border, 1)
 
-    local xBtn = new("TextButton", {
-        Text="✕", TextSize=11, Font=Enum.Font.GothamBold,
-        TextColor3=C.Accent, BackgroundColor3=C.AccentBG,
-        BorderSizePixel=0, Size=UDim2.new(0,30,0,22),
-        Position=UDim2.new(1,-34,0.5,-11), ZIndex=5,
-    }, tb)
-    outline(xBtn, C.AccentDim, 1)
+    local closeBtn = make("TextButton", {
+        Text = "✕",
+        TextSize = 11,
+        Font = Enum.Font.GothamBold,
+        TextColor3 = T.Accent,
+        BackgroundColor3 = T.AccentMuted,
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, 32, 0, 22),
+        Position = UDim2.new(1, -34, 0.5, -11),
+        ZIndex = 4,
+    }, titleBar)
+    mkStroke(closeBtn, T.AccentDim, 1)
 
-    -- Drag
-    local dragging, ds, ws
-    tb.InputBegan:Connect(function(i)
+    -- ── Drag ────────────────────────────────────────────────
+    local dragging, dStart, wStart
+    titleBar.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging=true; ds=i.Position; ws=win.Position
+            dragging = true; dStart = i.Position; wStart = win.Position
         end
     end)
-    tb.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging=false end
+    titleBar.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
     UserInputService.InputChanged:Connect(function(i)
-        if dragging and i.UserInputType==Enum.UserInputType.MouseMovement then
-            local d=i.Position-ds
-            win.Position=UDim2.new(ws.X.Scale,ws.X.Offset+d.X,ws.Y.Scale,ws.Y.Offset+d.Y)
+        if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+            local d = i.Position - dStart
+            win.Position = UDim2.new(wStart.X.Scale, wStart.X.Offset + d.X,
+                                      wStart.Y.Scale, wStart.Y.Offset + d.Y)
         end
     end)
 
-    -- Minimize / Close
-    local mini=false
+    -- ── Minimize / Close ────────────────────────────────────
+    local minimized = false
     minBtn.MouseButton1Click:Connect(function()
-        mini=not mini
-        anim(win,{Size=mini and UDim2.new(0,W,0,TH) or UDim2.new(0,W,0,H)},0.2)
-        minBtn.Text=mini and "□" or "─"
+        minimized = not minimized
+        tw(win, { Size = minimized
+            and UDim2.new(0, WIN_W, 0, TITLE_H)
+            or  UDim2.new(0, WIN_W, 0, WIN_H) }, 0.2)
+        minBtn.Text = minimized and "□" or "─"
     end)
-    xBtn.MouseButton1Click:Connect(function()
-        anim(win,{Size=UDim2.new(0,W,0,0)},0.15)
-        task.delay(0.16,function() pcall(function() gui:Destroy() end) end)
+    closeBtn.MouseButton1Click:Connect(function()
+        tw(win, { Size = UDim2.new(0, WIN_W, 0, 0) }, 0.16)
+        task.delay(0.18, function() pcall(function() gui:Destroy() end) end)
     end)
-    minBtn.MouseEnter:Connect(function() anim(minBtn,{BackgroundColor3=C.Hover}) end)
-    minBtn.MouseLeave:Connect(function() anim(minBtn,{BackgroundColor3=C.BG})   end)
-    xBtn.MouseEnter:Connect(function()  anim(xBtn,{BackgroundColor3=C.AccentDim}) end)
-    xBtn.MouseLeave:Connect(function()  anim(xBtn,{BackgroundColor3=C.AccentBG})  end)
+    minBtn.MouseEnter:Connect(function()  tw(minBtn,   { BackgroundColor3 = T.Hover }) end)
+    minBtn.MouseLeave:Connect(function()  tw(minBtn,   { BackgroundColor3 = T.BG   }) end)
+    closeBtn.MouseEnter:Connect(function() tw(closeBtn, { BackgroundColor3 = T.AccentDim  }) end)
+    closeBtn.MouseLeave:Connect(function() tw(closeBtn, { BackgroundColor3 = T.AccentMuted }) end)
 
-    -- ── Body (sidebar + content) ─────────────────────────
-    local body = new("Frame", {
-        Size=UDim2.new(1,0,1,-TH), Position=UDim2.new(0,0,0,TH),
-        BackgroundTransparency=1, BorderSizePixel=0,
+    -- ── Body (sidebar + content) ─────────────────────────────
+    local body = make("Frame", {
+        Size = UDim2.new(1, 0, 1, -TITLE_H),
+        Position = UDim2.new(0, 0, 0, TITLE_H),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
     }, win)
 
     -- Sidebar
-    local sidebar = new("Frame", {
-        Size=UDim2.new(0,SW,1,0),
-        BackgroundColor3=C.Sidebar, BorderSizePixel=0,
+    local sidebar = make("Frame", {
+        Size = UDim2.new(0, SIDE_W, 1, 0),
+        BackgroundColor3 = T.Sidebar,
+        BorderSizePixel = 0,
     }, body)
-    outline(sidebar, C.Border, 1)
+    mkStroke(sidebar, T.Border, 1)
 
-    -- Sidebar top label
-    new("TextLabel", {
-        Text="MENU", TextSize=8, Font=Enum.Font.GothamBold,
-        TextColor3=C.TextMuted, BackgroundTransparency=1,
-        Position=UDim2.new(0,12,0,8), Size=UDim2.new(1,0,0,18),
-        TextXAlignment=Enum.TextXAlignment.Left,
+    -- Sidebar header label
+    make("TextLabel", {
+        Text = "NAVIGATION",
+        TextSize = 8,
+        Font = Enum.Font.GothamBold,
+        TextColor3 = T.TextMuted,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 12, 0, 0),
+        Size = UDim2.new(1, -12, 0, 30),
+        TextXAlignment = Enum.TextXAlignment.Left,
     }, sidebar)
 
-    local tabStack = new("Frame", {
-        Size=UDim2.new(1,0,1,-26), Position=UDim2.new(0,0,0,26),
-        BackgroundTransparency=1, BorderSizePixel=0,
+    local sideTabList = make("Frame", {
+        Size = UDim2.new(1, 0, 1, -30),
+        Position = UDim2.new(0, 0, 0, 30),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
     }, sidebar)
-    vList(tabStack, 1)
+    mkList(sideTabList, nil, 2)
 
-    -- Content
-    local content = new("Frame", {
-        Size=UDim2.new(1,-SW,1,0), Position=UDim2.new(0,SW,0,0),
-        BackgroundColor3=C.BG, BorderSizePixel=0, ClipsDescendants=true,
+    -- Content holder
+    local contentHolder = make("Frame", {
+        Size = UDim2.new(1, -SIDE_W, 1, 0),
+        Position = UDim2.new(0, SIDE_W, 0, 0),
+        BackgroundColor3 = T.BG,
+        BorderSizePixel = 0,
+        ClipsDescendants = true,
     }, body)
 
-    -- Separator line between sidebar & content
-    new("Frame", { Size=UDim2.new(0,1,1,0), BackgroundColor3=C.Border, BorderSizePixel=0 }, content)
+    -- Separator between sidebar and content
+    make("Frame", {
+        Size = UDim2.new(0, 1, 1, 0),
+        BackgroundColor3 = T.Border,
+        BorderSizePixel = 0,
+    }, contentHolder)
 
-    -- ── Window Object ─────────────────────────────────────
+    -- ── Window Object ────────────────────────────────────────
     local Win = {
-        _tabBtns   = {},
-        _tabAccent = {},
-        _tabLabels = {},
-        _tabFrames = {},
-        _activeIdx = 1,
-        _gui       = gui,
-        HUDLabel   = hudLbl,
+        _tabBtns       = {},
+        _tabAccents    = {},
+        _contentFrames = {},
+        _tabs          = {},
+        _gui           = gui,
+        HUDLabel       = hudLabel,
     }
 
     -- Toast
-    function Win:Toast(msg, col)
-        col = col or C.Accent
-        local f = new("Frame", {
-            Size=UDim2.new(0,268,0,40),
-            BackgroundColor3=C.Panel, BorderSizePixel=0,
-            Position=UDim2.new(1,10,0,0),
-        }, toastHolder)
-        outline(f, col, 1)
-        new("Frame", { Size=UDim2.new(0,3,1,0), BackgroundColor3=col, BorderSizePixel=0 }, f)
-        new("TextLabel", {
-            Text=msg, TextSize=11, Font=Enum.Font.GothamBold,
-            TextColor3=C.Text, BackgroundTransparency=1,
-            Position=UDim2.new(0,10,0,0), Size=UDim2.new(1,-14,1,0),
-            TextXAlignment=Enum.TextXAlignment.Left,
-            TextTruncate=Enum.TextTruncate.AtEnd,
+    function Win:Toast(msg, color)
+        color = color or T.Accent
+        local f = make("Frame", {
+            Size = UDim2.new(0, 265, 0, 42),
+            BackgroundColor3 = T.Panel,
+            BorderSizePixel = 0,
+            Position = UDim2.new(1, 10, 0, 0),
+        }, toastBox)
+        mkStroke(f, color, 1)
+
+        make("Frame", {
+            Size = UDim2.new(0, 3, 1, 0),
+            BackgroundColor3 = color,
+            BorderSizePixel = 0,
         }, f)
-        anim(f, {Position=UDim2.new(1,-278,0,0)}, 0.25)
-        task.delay(3, function()
-            anim(f, {Position=UDim2.new(1,10,0,0)}, 0.2)
+
+        make("TextLabel", {
+            Text = msg,
+            TextSize = 11,
+            Font = Enum.Font.GothamBold,
+            TextColor3 = T.Text,
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0, 10, 0, 0),
+            Size = UDim2.new(1, -14, 1, 0),
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+        }, f)
+
+        tw(f, { Position = UDim2.new(1, -275, 0, 0) }, 0.25)
+        task.delay(3.2, function()
+            tw(f, { Position = UDim2.new(1, 10, 0, 0) }, 0.2)
             task.delay(0.22, function() pcall(function() f:Destroy() end) end)
         end)
     end
@@ -329,585 +398,731 @@ function VoidLib:CreateWindow(title, version)
         pcall(function() gui:Destroy() end)
     end
 
-    -- Internal: switch active tab
+    -- Tab switch
     local function switchTab(idx)
-        Win._activeIdx = idx
-        for i, btn in ipairs(Win._tabBtns) do
-            local on = (i==idx)
-            anim(btn, {BackgroundColor3 = on and C.AccentBG or C.Sidebar})
-            Win._tabLabels[i].TextColor3 = on and C.White or C.TextSub
-            anim(Win._tabAccent[i], {BackgroundColor3 = on and C.Accent or C.Sidebar})
+        for i, cf in ipairs(Win._contentFrames) do
+            cf.Visible = (i == idx)
         end
-        for i, frame in ipairs(Win._tabFrames) do
-            frame.Visible = (i==idx)
+        for i, btn in ipairs(Win._tabBtns) do
+            local active = (i == idx)
+            tw(btn, { BackgroundColor3 = active and T.AccentMuted or T.Sidebar })
+            btn.TextColor3 = active and T.White or T.TextDim
+            tw(Win._tabAccents[i], { BackgroundColor3 = active and T.Accent or T.Sidebar })
         end
     end
 
     -- AddTab
     function Win:AddTab(name)
-        local idx = #self._tabBtns + 1
+        local idx = #self._tabs + 1
 
         -- Sidebar button
-        local btn = new("TextButton", {
-            Text="", BackgroundColor3=idx==1 and C.AccentBG or C.Sidebar,
-            BorderSizePixel=0, Size=UDim2.new(1,0,0,40), ZIndex=3,
-        }, tabStack)
+        local tabBtn = make("TextButton", {
+            Text = "",
+            BackgroundColor3 = idx == 1 and T.AccentMuted or T.Sidebar,
+            BorderSizePixel = 0,
+            Size = UDim2.new(1, 0, 0, 40),
+            LayoutOrder = idx,
+            ZIndex = 2,
+        }, sideTabList)
 
         -- Left accent bar
-        local bar = new("Frame", {
-            Size=UDim2.new(0,3,1,0),
-            BackgroundColor3=idx==1 and C.Accent or C.Sidebar,
-            BorderSizePixel=0, ZIndex=4,
-        }, btn)
-        self._tabAccent[idx] = bar
+        local accentBar = make("Frame", {
+            Size = UDim2.new(0, 3, 1, 0),
+            BackgroundColor3 = idx == 1 and T.Accent or T.Sidebar,
+            BorderSizePixel = 0,
+            ZIndex = 3,
+        }, tabBtn)
+        self._tabAccents[idx] = accentBar
 
-        local lbl = new("TextLabel", {
-            Text=name:upper(), TextSize=11, Font=Enum.Font.GothamBold,
-            TextColor3=idx==1 and C.White or C.TextSub,
-            BackgroundTransparency=1,
-            Position=UDim2.new(0,14,0,0), Size=UDim2.new(1,-14,1,0),
-            TextXAlignment=Enum.TextXAlignment.Left, ZIndex=4,
-        }, btn)
-        self._tabLabels[idx] = lbl
-        self._tabBtns[idx]   = btn
+        make("TextLabel", {
+            Text = name:upper(),
+            TextSize = 11,
+            Font = Enum.Font.GothamBold,
+            TextColor3 = idx == 1 and T.White or T.TextDim,
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0, 16, 0, 0),
+            Size = UDim2.new(1, -16, 1, 0),
+            TextXAlignment = Enum.TextXAlignment.Left,
+            ZIndex = 3,
+        }, tabBtn)
 
-        local ci = idx
-        btn.MouseButton1Click:Connect(function() switchTab(ci) end)
-        btn.MouseEnter:Connect(function()
-            if Win._activeIdx ~= ci then anim(btn,{BackgroundColor3=C.Hover}) end
+        self._tabBtns[idx] = tabBtn
+
+        local captIdx = idx
+        tabBtn.MouseButton1Click:Connect(function() switchTab(captIdx) end)
+        tabBtn.MouseEnter:Connect(function()
+            if captIdx ~= (function()
+                for i, b in ipairs(self._tabBtns) do
+                    if b.BackgroundColor3 == T.AccentMuted then return i end
+                end
+                return 0
+            end)() then
+                tw(tabBtn, { BackgroundColor3 = T.Hover })
+            end
         end)
-        btn.MouseLeave:Connect(function()
-            if Win._activeIdx ~= ci then anim(btn,{BackgroundColor3=C.Sidebar}) end
+        tabBtn.MouseLeave:Connect(function()
+            -- revert only if not active
+            local isActive = (tabBtn.BackgroundColor3 == T.AccentMuted)
+            if not isActive then
+                tw(tabBtn, { BackgroundColor3 = T.Sidebar })
+            end
         end)
 
         -- Content frame
-        local cf = new("Frame", {
-            Size=UDim2.new(1,0,1,0), BackgroundTransparency=1,
-            Visible=idx==1, BorderSizePixel=0,
-        }, content)
-        self._tabFrames[idx] = cf
+        local cf = make("Frame", {
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundTransparency = 1,
+            Visible = (idx == 1),
+            BorderSizePixel = 0,
+        }, contentHolder)
+        self._contentFrames[idx] = cf
+        self._tabs[idx] = name
 
-        local sf = scrollFrame(cf)
+        local scroll = mkScroll(cf)
 
-        -- ── TAB COMPONENT BUILDERS ───────────────────────
-        local Tab = {}
+        -- ── TAB OBJECT ───────────────────────────────────────
+        local Tab = { _scroll = scroll, _win = self }
 
-        -- SECTION
+        -- ── SECTION ─────────────────────────────────────────
         function Tab:AddSection(label)
-            local row = new("Frame", {
-                Size=UDim2.new(1,0,0,26), BackgroundTransparency=1, BorderSizePixel=0,
-            }, sf)
-            new("Frame", {
-                Size=UDim2.new(0,3,0,11), Position=UDim2.new(0,0,0.5,-5.5),
-                BackgroundColor3=C.Accent, BorderSizePixel=0,
+            local row = make("Frame", {
+                Size = UDim2.new(1, 0, 0, 28),
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+            }, scroll)
+
+            -- Accent pip
+            make("Frame", {
+                Size = UDim2.new(0, 3, 0, 10),
+                Position = UDim2.new(0, 0, 0.5, -5),
+                BackgroundColor3 = T.Accent,
+                BorderSizePixel = 0,
             }, row)
-            new("TextLabel", {
-                Text=label:upper(), TextSize=9, Font=Enum.Font.GothamBold,
-                TextColor3=C.TextSub, BackgroundTransparency=1,
-                Position=UDim2.new(0,10,0,0), Size=UDim2.new(1,-12,1,0),
-                TextXAlignment=Enum.TextXAlignment.Left,
+
+            make("TextLabel", {
+                Text = label:upper(),
+                TextSize = 9,
+                Font = Enum.Font.GothamBold,
+                TextColor3 = T.TextMuted,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 10, 0, 0),
+                Size = UDim2.new(0.75, 0, 1, 0),
+                TextXAlignment = Enum.TextXAlignment.Left,
             }, row)
-            new("Frame", {
-                Size=UDim2.new(1,0,0,1), Position=UDim2.new(0,0,1,-1),
-                BackgroundColor3=C.Border, BorderSizePixel=0,
+
+            make("Frame", {
+                Size = UDim2.new(1, 0, 0, 1),
+                Position = UDim2.new(0, 0, 1, -1),
+                BackgroundColor3 = T.Border,
+                BorderSizePixel = 0,
             }, row)
+
             return row
         end
 
-        -- TOGGLE
-        function Tab:AddToggle(label, default, cb)
-            local state = default == true
+        -- ── TOGGLE ──────────────────────────────────────────
+        function Tab:AddToggle(label, default, callback)
+            local state = default or false
 
-            local row = new("Frame", {
-                Size=UDim2.new(1,0,0,38), BackgroundColor3=C.Row, BorderSizePixel=0,
-            }, sf)
-            outline(row, C.Border, 1)
+            local row = make("Frame", {
+                Size = UDim2.new(1, 0, 0, 38),
+                BackgroundColor3 = T.PanelAlt,
+                BorderSizePixel = 0,
+            }, scroll)
+            mkStroke(row, T.Border, 1)
 
-            -- Status strip (left edge)
-            local strip = new("Frame", {
-                Size=UDim2.new(0,2,1,0),
-                BackgroundColor3=state and C.Accent or C.Border, BorderSizePixel=0,
+            -- Left status strip
+            local strip = make("Frame", {
+                Size = UDim2.new(0, 2, 1, 0),
+                BackgroundColor3 = state and T.Accent or T.Border,
+                BorderSizePixel = 0,
             }, row)
 
-            new("TextLabel", {
-                Text=label, TextSize=12, Font=Enum.Font.GothamBold,
-                TextColor3=C.Text, BackgroundTransparency=1,
-                Position=UDim2.new(0,11,0,0), Size=UDim2.new(1,-70,1,0),
-                TextXAlignment=Enum.TextXAlignment.Left,
+            make("TextLabel", {
+                Text = label,
+                TextSize = 12,
+                Font = Enum.Font.GothamBold,
+                TextColor3 = T.Text,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 12, 0, 0),
+                Size = UDim2.new(1, -74, 1, 0),
+                TextXAlignment = Enum.TextXAlignment.Left,
             }, row)
 
-            -- Pill
-            local pill = new("Frame", {
-                Size=UDim2.new(0,44,0,20), Position=UDim2.new(1,-56,0.5,-10),
-                BackgroundColor3=state and C.On or C.Off, BorderSizePixel=0,
+            -- Toggle pill
+            local pill = make("Frame", {
+                Size = UDim2.new(0, 44, 0, 20),
+                Position = UDim2.new(1, -56, 0.5, -10),
+                BackgroundColor3 = state and T.OnColor or T.OffColor,
+                BorderSizePixel = 0,
             }, row)
-            outline(pill, C.Border, 1)
+            mkStroke(pill, T.Border, 1)
 
-            local knob = new("Frame", {
-                Size=UDim2.new(0,14,0,14),
-                Position=state and UDim2.new(1,-17,0.5,-7) or UDim2.new(0,3,0.5,-7),
-                BackgroundColor3=C.White, BorderSizePixel=0,
+            local knob = make("Frame", {
+                Size = UDim2.new(0, 14, 0, 14),
+                Position = state and UDim2.new(1,-17,0.5,-7) or UDim2.new(0,3,0.5,-7),
+                BackgroundColor3 = T.White,
+                BorderSizePixel = 0,
             }, pill)
 
-            local hit = new("TextButton", {
-                Text="", BackgroundTransparency=1, Size=UDim2.new(1,0,1,0), ZIndex=2,
+            local hitbox = make("TextButton", {
+                Text = "", BackgroundTransparency = 1,
+                Size = UDim2.new(1,0,1,0), ZIndex = 2,
             }, row)
 
-            local T = { Value=state }
-            local function apply(v)
-                T.Value = v
-                anim(pill,  {BackgroundColor3=v and C.On or C.Off})
-                anim(knob,  {Position=v and UDim2.new(1,-17,0.5,-7) or UDim2.new(0,3,0.5,-7)})
-                anim(strip, {BackgroundColor3=v and C.Accent or C.Border})
-            end
-            function T:Set(v) apply(v); if cb then cb(v) end end
-            T.SetValue = T.Set
+            local Toggle = { Value = state }
 
-            hit.MouseButton1Click:Connect(function()
-                apply(not T.Value); if cb then cb(T.Value) end
+            local function applyToggle(v)
+                Toggle.Value = v
+                tw(pill,  { BackgroundColor3 = v and T.OnColor or T.OffColor })
+                tw(knob,  { Position = v and UDim2.new(1,-17,0.5,-7) or UDim2.new(0,3,0.5,-7) })
+                tw(strip, { BackgroundColor3 = v and T.Accent or T.Border })
+            end
+
+            function Toggle:Set(v)
+                applyToggle(v)
+                if callback then callback(v) end
+            end
+            -- backward compat alias
+            Toggle.SetValue = Toggle.Set
+
+            hitbox.MouseButton1Click:Connect(function()
+                applyToggle(not Toggle.Value)
+                if callback then callback(Toggle.Value) end
             end)
-            hit.MouseEnter:Connect(function() anim(row,{BackgroundColor3=C.Hover})  end)
-            hit.MouseLeave:Connect(function() anim(row,{BackgroundColor3=C.Row})    end)
-            return T
+            hitbox.MouseEnter:Connect(function() tw(row, { BackgroundColor3 = T.Hover }) end)
+            hitbox.MouseLeave:Connect(function() tw(row, { BackgroundColor3 = T.PanelAlt }) end)
+
+            return Toggle
         end
 
-        -- SLIDER
-        function Tab:AddSlider(label, minV, maxV, def, cb)
-            local val = math.clamp(def or minV, minV, maxV)
+        -- ── SLIDER ──────────────────────────────────────────
+        function Tab:AddSlider(label, minV, maxV, default, callback)
+            local val = math.clamp(default or minV, minV, maxV)
 
-            local row = new("Frame", {
-                Size=UDim2.new(1,0,0,50), BackgroundColor3=C.Row, BorderSizePixel=0,
-            }, sf)
-            outline(row, C.Border, 1)
+            local row = make("Frame", {
+                Size = UDim2.new(1, 0, 0, 52),
+                BackgroundColor3 = T.PanelAlt,
+                BorderSizePixel = 0,
+            }, scroll)
+            mkStroke(row, T.Border, 1)
 
-            new("Frame", { Size=UDim2.new(0,2,1,0), BackgroundColor3=C.AccentDim, BorderSizePixel=0 }, row)
-
-            new("TextLabel", {
-                Text=label, TextSize=11, Font=Enum.Font.GothamBold,
-                TextColor3=C.Text, BackgroundTransparency=1,
-                Position=UDim2.new(0,11,0,6), Size=UDim2.new(0.72,0,0,16),
-                TextXAlignment=Enum.TextXAlignment.Left,
+            -- Left strip
+            make("Frame", {
+                Size = UDim2.new(0, 2, 1, 0),
+                BackgroundColor3 = T.AccentDim,
+                BorderSizePixel = 0,
             }, row)
 
-            local vLbl = new("TextLabel", {
-                Text=tostring(val), TextSize=12, Font=Enum.Font.GothamBold,
-                TextColor3=C.Accent, BackgroundTransparency=1,
-                Position=UDim2.new(0.72,0,0,5), Size=UDim2.new(0.28,-12,0,18),
-                TextXAlignment=Enum.TextXAlignment.Right,
+            make("TextLabel", {
+                Text = label,
+                TextSize = 11,
+                Font = Enum.Font.GothamBold,
+                TextColor3 = T.Text,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 12, 0, 7),
+                Size = UDim2.new(0.72, 0, 0, 16),
+                TextXAlignment = Enum.TextXAlignment.Left,
             }, row)
 
-            local track = new("Frame", {
-                Size=UDim2.new(1,-22,0,3), Position=UDim2.new(0,11,0,34),
-                BackgroundColor3=C.Track, BorderSizePixel=0,
+            local valLbl = make("TextLabel", {
+                Text = tostring(val),
+                TextSize = 12,
+                Font = Enum.Font.GothamBold,
+                TextColor3 = T.Accent,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0.72, 0, 0, 6),
+                Size = UDim2.new(0.28, -12, 0, 18),
+                TextXAlignment = Enum.TextXAlignment.Right,
             }, row)
 
-            local p0 = (val-minV)/math.max(maxV-minV,1)
-            local fill = new("Frame", {
-                Size=UDim2.new(p0,0,1,0), BackgroundColor3=C.Accent, BorderSizePixel=0,
+            local track = make("Frame", {
+                Size = UDim2.new(1, -24, 0, 3),
+                Position = UDim2.new(0, 12, 0, 36),
+                BackgroundColor3 = T.TrackBG,
+                BorderSizePixel = 0,
+            }, row)
+
+            local p0 = (val - minV) / math.max(maxV - minV, 1)
+            local fill = make("Frame", {
+                Size = UDim2.new(p0, 0, 1, 0),
+                BackgroundColor3 = T.Accent,
+                BorderSizePixel = 0,
             }, track)
-            local thumb = new("Frame", {
-                Size=UDim2.new(0,11,0,11), Position=UDim2.new(p0,-6,0.5,-6),
-                BackgroundColor3=C.White, BorderSizePixel=0,
+
+            local thumb = make("Frame", {
+                Size = UDim2.new(0, 11, 0, 11),
+                Position = UDim2.new(p0, -6, 0.5, -6),
+                BackgroundColor3 = T.White,
+                BorderSizePixel = 0,
             }, track)
-            outline(thumb, C.Accent, 1)
+            mkStroke(thumb, T.Accent, 1)
 
-            local S = { Value=val }
-            local drag=false
+            local Slider = { Value = val }
+            local draggingSlider = false
 
-            local function applyPos(ax)
-                local p = math.clamp((ax-track.AbsolutePosition.X)/math.max(track.AbsoluteSize.X,1),0,1)
-                local v = math.floor(minV+(maxV-minV)*p+0.5)
-                S.Value=v; vLbl.Text=tostring(v)
-                fill.Size=UDim2.new(p,0,1,0); thumb.Position=UDim2.new(p,-6,0.5,-6)
-                if cb then cb(v) end
+            local function applySlider(absX)
+                local tx = track.AbsolutePosition.X
+                local tw_ = math.max(track.AbsoluteSize.X, 1)
+                local p = math.clamp((absX - tx) / tw_, 0, 1)
+                local v = math.floor(minV + (maxV - minV) * p + 0.5)
+                Slider.Value = v
+                valLbl.Text = tostring(v)
+                fill.Size = UDim2.new(p, 0, 1, 0)
+                thumb.Position = UDim2.new(p, -6, 0.5, -6)
+                if callback then callback(v) end
             end
-            function S:Set(v)
-                v=math.clamp(v,minV,maxV); self.Value=v
-                local p=(v-minV)/math.max(maxV-minV,1)
-                vLbl.Text=tostring(v)
-                fill.Size=UDim2.new(p,0,1,0); thumb.Position=UDim2.new(p,-6,0.5,-6)
-            end
-            S.SetValue = S.Set
 
-            local th = new("TextButton", {
-                Text="", BackgroundTransparency=1,
-                Size=UDim2.new(1,0,5,0), Position=UDim2.new(0,0,-2,0), ZIndex=3,
+            function Slider:Set(v)
+                val = math.clamp(v, minV, maxV)
+                local p = (val - minV) / math.max(maxV - minV, 1)
+                self.Value = val
+                valLbl.Text = tostring(val)
+                fill.Size = UDim2.new(p, 0, 1, 0)
+                thumb.Position = UDim2.new(p, -6, 0.5, -6)
+            end
+            Slider.SetValue = Slider.Set
+
+            local trackHit = make("TextButton", {
+                Text = "", BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 6, 0),
+                Position = UDim2.new(0, 0, -2.5, 0),
+                ZIndex = 3,
             }, track)
-            th.MouseButton1Down:Connect(function()
-                drag=true; applyPos(UserInputService:GetMouseLocation().X)
+            trackHit.MouseButton1Down:Connect(function()
+                draggingSlider = true
+                applySlider(UserInputService:GetMouseLocation().X)
             end)
             UserInputService.InputChanged:Connect(function(i)
-                if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-                    applyPos(i.Position.X)
+                if draggingSlider and i.UserInputType == Enum.UserInputType.MouseMovement then
+                    applySlider(i.Position.X)
                 end
             end)
             UserInputService.InputEnded:Connect(function(i)
-                if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then drag=false end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 then
+                    draggingSlider = false
+                end
             end)
-            return S
+
+            return Slider
         end
 
-        -- BUTTON
-        function Tab:AddButton(label, btnText, cb)
-            local row = new("Frame", {
-                Size=UDim2.new(1,0,0,38), BackgroundColor3=C.Row, BorderSizePixel=0,
-            }, sf)
-            outline(row, C.Border, 1)
+        -- ── BUTTON ──────────────────────────────────────────
+        function Tab:AddButton(label, subLabel, callback)
+            local row = make("Frame", {
+                Size = UDim2.new(1, 0, 0, 38),
+                BackgroundColor3 = T.PanelAlt,
+                BorderSizePixel = 0,
+            }, scroll)
+            mkStroke(row, T.Border, 1)
 
-            local lbl = new("TextLabel", {
-                Text=label, TextSize=12, Font=Enum.Font.GothamBold,
-                TextColor3=C.Text, BackgroundTransparency=1,
-                Position=UDim2.new(0,11,0,0), Size=UDim2.new(0.62,0,1,0),
-                TextXAlignment=Enum.TextXAlignment.Left,
+            local lbl = make("TextLabel", {
+                Text = label,
+                TextSize = 12,
+                Font = Enum.Font.GothamBold,
+                TextColor3 = T.Text,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 12, 0, 0),
+                Size = UDim2.new(0.6, 0, 1, 0),
+                TextXAlignment = Enum.TextXAlignment.Left,
             }, row)
 
-            local btn = new("TextButton", {
-                Text=btnText or "RUN", TextSize=10, Font=Enum.Font.GothamBold,
-                TextColor3=C.White, BackgroundColor3=C.Accent,
-                BorderSizePixel=0, Size=UDim2.new(0,84,0,24),
-                Position=UDim2.new(1,-96,0.5,-12),
+            local btn = make("TextButton", {
+                Text = subLabel or "RUN",
+                TextSize = 10,
+                Font = Enum.Font.GothamBold,
+                TextColor3 = T.White,
+                BackgroundColor3 = T.Accent,
+                BorderSizePixel = 0,
+                Size = UDim2.new(0, 84, 0, 24),
+                Position = UDim2.new(1, -96, 0.5, -12),
             }, row)
-            outline(btn, C.AccentDim, 1)
+            mkStroke(btn, T.AccentDim, 1)
 
             btn.MouseButton1Click:Connect(function()
-                anim(btn,{BackgroundColor3=C.AccentGlow},0.06)
-                task.delay(0.12,function() anim(btn,{BackgroundColor3=C.Accent},0.1) end)
-                if cb then cb() end
+                tw(btn, { BackgroundColor3 = T.AccentGlow }, 0.06)
+                task.delay(0.12, function() tw(btn, { BackgroundColor3 = T.Accent }, 0.1) end)
+                if callback then callback() end
             end)
-            btn.MouseEnter:Connect(function()  anim(btn,{BackgroundColor3=C.AccentDim}) end)
-            btn.MouseLeave:Connect(function()  anim(btn,{BackgroundColor3=C.Accent})    end)
-            row.MouseEnter:Connect(function()  anim(row,{BackgroundColor3=C.Hover})     end)
-            row.MouseLeave:Connect(function()  anim(row,{BackgroundColor3=C.Row})       end)
+            btn.MouseEnter:Connect(function()  tw(btn, { BackgroundColor3 = T.AccentDim  }) end)
+            btn.MouseLeave:Connect(function()  tw(btn, { BackgroundColor3 = T.Accent     }) end)
+            row.MouseEnter:Connect(function()  tw(row, { BackgroundColor3 = T.Hover      }) end)
+            row.MouseLeave:Connect(function()  tw(row, { BackgroundColor3 = T.PanelAlt   }) end)
 
-            local Btn={}
-            function Btn:SetLabel(t) lbl.Text=t end
+            local Btn = {}
+            function Btn:SetLabel(t) lbl.Text = t end
             return Btn
         end
 
-        -- DROPDOWN
-        function Tab:AddDropdown(label, opts, def, cb)
-            local sel=def or 1; local open=false
+        -- ── DROPDOWN ────────────────────────────────────────
+        function Tab:AddDropdown(label, options, defaultIdx, callback)
+            local selected = defaultIdx or 1
+            local open = false
 
-            local row = new("Frame", {
-                Size=UDim2.new(1,0,0,38), BackgroundColor3=C.Row, BorderSizePixel=0,
-                ClipsDescendants=false, ZIndex=5,
-            }, sf)
-            outline(row, C.Border, 1)
+            local row = make("Frame", {
+                Size = UDim2.new(1, 0, 0, 38),
+                BackgroundColor3 = T.PanelAlt,
+                BorderSizePixel = 0,
+                ClipsDescendants = false,
+                ZIndex = 5,
+            }, scroll)
+            mkStroke(row, T.Border, 1)
 
-            new("TextLabel", {
-                Text=label, TextSize=12, Font=Enum.Font.GothamBold,
-                TextColor3=C.Text, BackgroundTransparency=1,
-                Position=UDim2.new(0,11,0,0), Size=UDim2.new(0.52,0,1,0),
-                TextXAlignment=Enum.TextXAlignment.Left, ZIndex=5,
+            make("TextLabel", {
+                Text = label,
+                TextSize = 12, Font = Enum.Font.GothamBold,
+                TextColor3 = T.Text, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 12, 0, 0),
+                Size = UDim2.new(0.52, 0, 1, 0),
+                TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5,
             }, row)
 
-            local selLbl = new("TextLabel", {
-                Text=opts[sel] or "...", TextSize=11, Font=Enum.Font.Gotham,
-                TextColor3=C.Accent, BackgroundTransparency=1,
-                Position=UDim2.new(0.52,0,0,0), Size=UDim2.new(0.4,0,1,0),
-                TextXAlignment=Enum.TextXAlignment.Right, ZIndex=5,
+            local selLbl = make("TextLabel", {
+                Text = options[selected] or "...",
+                TextSize = 11, Font = Enum.Font.Gotham,
+                TextColor3 = T.Accent, BackgroundTransparency = 1,
+                Position = UDim2.new(0.52, 0, 0, 0),
+                Size = UDim2.new(0.4, 0, 1, 0),
+                TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 5,
             }, row)
 
-            local arr = new("TextLabel", {
-                Text="▾", TextSize=13, Font=Enum.Font.GothamBold,
-                TextColor3=C.TextSub, BackgroundTransparency=1,
-                Position=UDim2.new(1,-22,0,0), Size=UDim2.new(0,18,1,0),
-                TextXAlignment=Enum.TextXAlignment.Center, ZIndex=5,
+            local arrow = make("TextLabel", {
+                Text = "▾", TextSize = 14, Font = Enum.Font.GothamBold,
+                TextColor3 = T.TextDim, BackgroundTransparency = 1,
+                Position = UDim2.new(1, -22, 0, 0),
+                Size = UDim2.new(0, 18, 1, 0),
+                TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 5,
             }, row)
 
-            local ddF = new("Frame", {
-                Size=UDim2.new(1,0,0,math.min(#opts,5)*28),
-                Position=UDim2.new(0,0,1,2),
-                BackgroundColor3=C.Panel, BorderSizePixel=0,
-                Visible=false, ZIndex=20, ClipsDescendants=true,
+            local ddFrame = make("Frame", {
+                Size = UDim2.new(1, 0, 0, math.min(#options, 5) * 28),
+                Position = UDim2.new(0, 0, 1, 2),
+                BackgroundColor3 = T.Panel, BorderSizePixel = 0,
+                Visible = false, ZIndex = 20, ClipsDescendants = true,
             }, row)
-            outline(ddF, C.Accent, 1)
+            mkStroke(ddFrame, T.Accent, 1)
 
-            local ddS = new("ScrollingFrame", {
-                Size=UDim2.new(1,0,1,0), BackgroundTransparency=1, BorderSizePixel=0,
-                ScrollBarThickness=2, ScrollBarImageColor3=C.Accent,
-                CanvasSize=UDim2.new(0,0,0,0), AutomaticCanvasSize=Enum.AutomaticSize.Y,
-                ZIndex=20,
-            }, ddF)
-            vList(ddS, 0)
+            local ddScroll = make("ScrollingFrame", {
+                Size = UDim2.new(1, 0, 1, 0),
+                BackgroundTransparency = 1, BorderSizePixel = 0,
+                ScrollBarThickness = 2, ScrollBarImageColor3 = T.Accent,
+                CanvasSize = UDim2.new(0, 0, 0, 0),
+                AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 20,
+            }, ddFrame)
+            mkList(ddScroll, nil, 0)
 
-            local DD={Value=opts[sel], Index=sel}
+            local DD = { Value = options[selected], Index = selected }
 
-            local function buildOpts(o)
-                for _,c in ipairs(ddS:GetChildren()) do
+            local function buildOpts(opts)
+                for _, c in ipairs(ddScroll:GetChildren()) do
                     if c:IsA("TextButton") then c:Destroy() end
                 end
-                for i,opt in ipairs(o) do
-                    local it = new("TextButton", {
-                        Text="  "..opt, TextSize=11, Font=Enum.Font.Gotham,
-                        TextColor3=C.Text,
-                        BackgroundColor3=i==sel and C.AccentDim or C.Panel,
-                        BorderSizePixel=0, Size=UDim2.new(1,0,0,28),
-                        TextXAlignment=Enum.TextXAlignment.Left, ZIndex=21,
-                    }, ddS)
-                    local ci=i
-                    it.MouseButton1Click:Connect(function()
-                        sel=ci; DD.Value=opt; DD.Index=ci
-                        selLbl.Text=opt; open=false
-                        ddF.Visible=false; arr.Text="▾"
-                        row.ZIndex = 5
-                        if cb then cb(ci,opt) end
+                for i, opt in ipairs(opts) do
+                    local item = make("TextButton", {
+                        Text = "  " .. opt, TextSize = 11, Font = Enum.Font.Gotham,
+                        TextColor3 = T.Text,
+                        BackgroundColor3 = i == selected and T.AccentDim or T.Panel,
+                        BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 28),
+                        TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 21,
+                    }, ddScroll)
+                    local ci = i
+                    item.MouseButton1Click:Connect(function()
+                        selected = ci; DD.Value = opt; DD.Index = ci
+                        selLbl.Text = opt; open = false
+                        ddFrame.Visible = false; arrow.Text = "▾"
+                        if callback then callback(ci, opt) end
                     end)
-                    it.MouseEnter:Connect(function() anim(it,{BackgroundColor3=C.AccentDim}) end)
-                    it.MouseLeave:Connect(function()
-                        anim(it,{BackgroundColor3=ci==sel and C.AccentDim or C.Panel})
+                    item.MouseEnter:Connect(function() tw(item, { BackgroundColor3 = T.AccentDim }) end)
+                    item.MouseLeave:Connect(function()
+                        tw(item, { BackgroundColor3 = ci == selected and T.AccentDim or T.Panel })
                     end)
                 end
             end
-            buildOpts(opts)
 
-            function DD:SetOptions(o)
-                opts = o
-                local oldVal = self.Value
-                local found = table.find(o, oldVal)
-                if found then
-                    sel = found
-                    self.Value = oldVal
-                    self.Index = found
-                    selLbl.Text = oldVal
-                else
-                    sel = 1
-                    self.Value = o[1]
-                    self.Index = 1
-                    selLbl.Text = o[1] or "..."
-                end
-                buildOpts(o)
+            buildOpts(options)
+
+            function DD:SetOptions(opts)
+                options = opts; selected = 1
+                self.Value = opts[1]; self.Index = 1
+                selLbl.Text = opts[1] or "..."
+                buildOpts(opts)
             end
 
-            local hit = new("TextButton", {
-                Text="", BackgroundTransparency=1, Size=UDim2.new(1,0,1,0), ZIndex=6,
+            local hit = make("TextButton", {
+                Text = "", BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 1, 0), ZIndex = 6,
             }, row)
             hit.MouseButton1Click:Connect(function()
-                open=not open; ddF.Visible=open; arr.Text=open and "▴" or "▾"
-                row.ZIndex = open and 15 or 5
+                open = not open; ddFrame.Visible = open
+                arrow.Text = open and "▴" or "▾"
             end)
-            row.MouseEnter:Connect(function() anim(row,{BackgroundColor3=C.Hover}) end)
-            row.MouseLeave:Connect(function() anim(row,{BackgroundColor3=C.Row})   end)
+            row.MouseEnter:Connect(function() tw(row, { BackgroundColor3 = T.Hover    }) end)
+            row.MouseLeave:Connect(function() tw(row, { BackgroundColor3 = T.PanelAlt }) end)
+
             return DD
         end
 
-        -- KEYBIND
-        function Tab:AddKeybind(label, defKey, cb)
-            local curKey = defKey or Enum.KeyCode.Unknown
-            local listening = false
+        -- ── KEYBIND ─────────────────────────────────────────
+        function Tab:AddKeybind(label, defaultKey, callback)
+            local currentKey = defaultKey or Enum.KeyCode.Unknown
+            local listening  = false
 
-            local row = new("Frame", {
-                Size=UDim2.new(1,0,0,38), BackgroundColor3=C.Row, BorderSizePixel=0,
-            }, sf)
-            outline(row, C.Border, 1)
+            local row = make("Frame", {
+                Size = UDim2.new(1, 0, 0, 38),
+                BackgroundColor3 = T.PanelAlt,
+                BorderSizePixel = 0,
+            }, scroll)
+            mkStroke(row, T.Border, 1)
 
-            new("TextLabel", {
-                Text=label, TextSize=12, Font=Enum.Font.GothamBold,
-                TextColor3=C.Text, BackgroundTransparency=1,
-                Position=UDim2.new(0,11,0,0), Size=UDim2.new(0.62,0,1,0),
-                TextXAlignment=Enum.TextXAlignment.Left,
+            make("TextLabel", {
+                Text = label,
+                TextSize = 12, Font = Enum.Font.GothamBold,
+                TextColor3 = T.Text, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 12, 0, 0),
+                Size = UDim2.new(0.62, 0, 1, 0),
+                TextXAlignment = Enum.TextXAlignment.Left,
             }, row)
 
-            local function kName(k)
-                local s=tostring(k):gsub("Enum%.KeyCode%.","")
-                return s=="Unknown" and "NONE" or s
+            local function keyName(k)
+                local n = tostring(k):gsub("Enum.KeyCode.", "")
+                return n == "Unknown" and "NONE" or n:upper()
             end
 
-            local kBtn = new("TextButton", {
-                Text="["..kName(curKey).."]",
-                TextSize=10, Font=Enum.Font.GothamBold,
-                TextColor3=C.TextSub, BackgroundColor3=C.BG,
-                BorderSizePixel=0, Size=UDim2.new(0,80,0,24),
-                Position=UDim2.new(1,-92,0.5,-12),
+            local bindBtn = make("TextButton", {
+                Text = "[ " .. keyName(currentKey) .. " ]",
+                TextSize = 10, Font = Enum.Font.GothamBold,
+                TextColor3 = T.TextDim,
+                BackgroundColor3 = T.BindColor,
+                BorderSizePixel = 0,
+                Size = UDim2.new(0, 84, 0, 24),
+                Position = UDim2.new(1, -96, 0.5, -12),
             }, row)
-            outline(kBtn, C.Border, 1)
+            mkStroke(bindBtn, T.Border, 1)
 
-            local KB={Key=curKey}
-            function KB:Set(k)
-                curKey=k; self.Key=k; listening=false; _bindActive=false
-                kBtn.Text="["..kName(k).."]"
-                kBtn.TextColor3=C.TextSub
-                anim(kBtn,{BackgroundColor3=C.BG})
-                outline(kBtn, C.Border, 1)
+            local KB = { Key = currentKey }
+
+            function KB:Set(key)
+                currentKey = key; self.Key = key
+                listening = false; _listeningForBind = false
+                bindBtn.Text = "[ " .. keyName(key) .. " ]"
+                bindBtn.TextColor3 = T.TextDim
+                tw(bindBtn, { BackgroundColor3 = T.BindColor })
+                mkStroke(bindBtn, T.Border, 1)
             end
 
-            kBtn.MouseButton1Click:Connect(function()
+            bindBtn.MouseButton1Click:Connect(function()
                 if listening then
-                    listening=false; _bindActive=false
-                    kBtn.Text="["..kName(curKey).."]"; kBtn.TextColor3=C.TextSub
-                    anim(kBtn,{BackgroundColor3=C.BG})
+                    listening = false; _listeningForBind = false
+                    bindBtn.Text = "[ " .. keyName(currentKey) .. " ]"
+                    bindBtn.TextColor3 = T.TextDim
+                    tw(bindBtn, { BackgroundColor3 = T.BindColor })
                 else
-                    listening=true; _bindActive=true
-                    kBtn.Text="[...]"; kBtn.TextColor3=C.Accent
-                    anim(kBtn,{BackgroundColor3=C.AccentBG})
+                    listening = true; _listeningForBind = true
+                    bindBtn.Text = "[ ... ]"
+                    bindBtn.TextColor3 = T.Accent
+                    tw(bindBtn, { BackgroundColor3 = T.BindActive })
                 end
             end)
 
-            UserInputService.InputBegan:Connect(function(inp, gpe)
-                if not listening or gpe then return end
-                if inp.UserInputType~=Enum.UserInputType.Keyboard then return end
-                if inp.KeyCode==Enum.KeyCode.Escape then
-                    KB:Set(curKey)
-                else
-                    KB:Set(inp.KeyCode)
-                    if cb then cb(inp.KeyCode) end
+            UserInputService.InputBegan:Connect(function(input, gpe)
+                if not listening then return end
+                if gpe then return end
+                if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+                if input.KeyCode == Enum.KeyCode.Escape then
+                    listening = false; _listeningForBind = false
+                    bindBtn.Text = "[ " .. keyName(currentKey) .. " ]"
+                    bindBtn.TextColor3 = T.TextDim
+                    tw(bindBtn, { BackgroundColor3 = T.BindColor })
+                    return
                 end
+                KB:Set(input.KeyCode)
+                if callback then callback(input.KeyCode) end
             end)
 
-            row.MouseEnter:Connect(function() anim(row,{BackgroundColor3=C.Hover}) end)
-            row.MouseLeave:Connect(function() anim(row,{BackgroundColor3=C.Row})   end)
+            row.MouseEnter:Connect(function() tw(row, { BackgroundColor3 = T.Hover    }) end)
+            row.MouseLeave:Connect(function() tw(row, { BackgroundColor3 = T.PanelAlt }) end)
+
             return KB
         end
 
-        -- INFO ROW
-        function Tab:AddInfoRow(label, val)
-            local row = new("Frame", {
-                Size=UDim2.new(1,0,0,32), BackgroundColor3=C.Row, BorderSizePixel=0,
-            }, sf)
-            outline(row, C.Border, 1)
+        -- ── INFO ROW ────────────────────────────────────────
+        function Tab:AddInfoRow(label, valueStr)
+            local row = make("Frame", {
+                Size = UDim2.new(1, 0, 0, 34),
+                BackgroundColor3 = T.PanelAlt,
+                BorderSizePixel = 0,
+            }, scroll)
+            mkStroke(row, T.Border, 1)
 
-            new("TextLabel", {
-                Text=label, TextSize=11, Font=Enum.Font.Gotham,
-                TextColor3=C.TextSub, BackgroundTransparency=1,
-                Position=UDim2.new(0,11,0,0), Size=UDim2.new(0.54,0,1,0),
-                TextXAlignment=Enum.TextXAlignment.Left,
+            make("TextLabel", {
+                Text = label, TextSize = 11, Font = Enum.Font.Gotham,
+                TextColor3 = T.TextDim, BackgroundTransparency = 1,
+                Position = UDim2.new(0, 12, 0, 0),
+                Size = UDim2.new(0.52, 0, 1, 0),
+                TextXAlignment = Enum.TextXAlignment.Left,
             }, row)
 
-            local vl = new("TextLabel", {
-                Text=val or "--", TextSize=11, Font=Enum.Font.GothamBold,
-                TextColor3=C.Text, BackgroundTransparency=1,
-                Position=UDim2.new(0.54,0,0,0), Size=UDim2.new(0.46,-12,1,0),
-                TextXAlignment=Enum.TextXAlignment.Right,
+            local valLbl = make("TextLabel", {
+                Text = valueStr or "--", TextSize = 11, Font = Enum.Font.GothamBold,
+                TextColor3 = T.Text, BackgroundTransparency = 1,
+                Position = UDim2.new(0.52, 0, 0, 0),
+                Size = UDim2.new(0.48, -12, 1, 0),
+                TextXAlignment = Enum.TextXAlignment.Right,
             }, row)
 
-            local IR={}
-            function IR:SetValue(v) vl.Text=tostring(v) end
-            function IR:SetColor(c) vl.TextColor3=c end
-            IR.ValueLabel=vl
+            local IR = {}
+            function IR:SetValue(v) valLbl.Text = tostring(v) end
+            function IR:SetColor(c) valLbl.TextColor3 = c end
+            IR.ValueLabel = valLbl
             return IR
         end
 
-        -- TEXT INPUT
-        function Tab:AddTextInput(placeholder, btnText, cb)
-            local row = new("Frame", {
-                Size=UDim2.new(1,0,0,38), BackgroundColor3=C.Row, BorderSizePixel=0,
-            }, sf)
-            outline(row, C.Accent, 1)
+        -- ── TEXT INPUT ──────────────────────────────────────
+        function Tab:AddTextInput(placeholder, btnTxt, callback)
+            local row = make("Frame", {
+                Size = UDim2.new(1, 0, 0, 38),
+                BackgroundColor3 = T.PanelAlt,
+                BorderSizePixel = 0,
+            }, scroll)
+            mkStroke(row, T.Accent, 1)
 
-            local box = new("TextBox", {
-                PlaceholderText=placeholder or "...", Text="",
-                TextSize=11, Font=Enum.Font.Gotham,
-                TextColor3=C.Text, PlaceholderColor3=C.TextMuted,
-                BackgroundColor3=C.BG, BorderSizePixel=0,
-                ClearTextOnFocus=false,
-                Size=UDim2.new(1,-104,0,24), Position=UDim2.new(0,8,0.5,-12),
+            local box = make("TextBox", {
+                PlaceholderText = placeholder or "Type here...",
+                Text = "", TextSize = 11, Font = Enum.Font.Gotham,
+                TextColor3 = T.Text, PlaceholderColor3 = T.TextMuted,
+                BackgroundColor3 = T.Panel, BorderSizePixel = 0,
+                ClearTextOnFocus = false,
+                Size = UDim2.new(1, -106, 0, 24),
+                Position = UDim2.new(0, 8, 0.5, -12),
             }, row)
-            outline(box, C.Border, 1)
+            mkStroke(box, T.Border, 1)
 
-            local btn = new("TextButton", {
-                Text=btnText or "GO", TextSize=10, Font=Enum.Font.GothamBold,
-                TextColor3=C.White, BackgroundColor3=C.Accent,
-                BorderSizePixel=0, Size=UDim2.new(0,84,0,24),
-                Position=UDim2.new(1,-96,0.5,-12),
+            local btn = make("TextButton", {
+                Text = btnTxt or "GO", TextSize = 10, Font = Enum.Font.GothamBold,
+                TextColor3 = T.White, BackgroundColor3 = T.Accent,
+                BorderSizePixel = 0,
+                Size = UDim2.new(0, 84, 0, 24),
+                Position = UDim2.new(1, -96, 0.5, -12),
             }, row)
-            outline(btn, C.AccentDim, 1)
+            mkStroke(btn, T.AccentDim, 1)
 
-            btn.MouseButton1Click:Connect(function() if cb then cb(box.Text) end end)
-            box.FocusLost:Connect(function(enter) if enter and cb then cb(box.Text) end end)
-            btn.MouseEnter:Connect(function() anim(btn,{BackgroundColor3=C.AccentDim}) end)
-            btn.MouseLeave:Connect(function() anim(btn,{BackgroundColor3=C.Accent})    end)
+            btn.MouseButton1Click:Connect(function()
+                if callback then callback(box.Text) end
+            end)
+            box.FocusLost:Connect(function(enter)
+                if enter and callback then callback(box.Text) end
+            end)
+            btn.MouseEnter:Connect(function() tw(btn, { BackgroundColor3 = T.AccentDim }) end)
+            btn.MouseLeave:Connect(function() tw(btn, { BackgroundColor3 = T.Accent    }) end)
 
-            local TI={}
+            local TI = {}
             function TI:GetText() return box.Text end
-            function TI:SetText(t) box.Text=t end
-            function TI:Clear() box.Text="" end
+            function TI:SetText(t) box.Text = t end
+            function TI:Clear() box.Text = "" end
             return TI
         end
 
-        -- PLAYER LIST  (supports 1 or 2 action buttons per row)
-        function Tab:AddPlayerList(btn1Lbl, btn1Cb, btn2Lbl, btn2Cb)
-            local dual = btn2Lbl ~= nil
+        -- ── PLAYER LIST ─────────────────────────────────────
+        -- btn2Label / btn2Callback are optional (single-action vs dual-action)
+        function Tab:AddPlayerList(btn1Label, btn1Cb, btn2Label, btn2Cb)
+            local dual = btn2Label ~= nil
 
-            local container = new("Frame", {
-                Size=UDim2.new(1,0,0,0), AutomaticSize=Enum.AutomaticSize.Y,
-                BackgroundTransparency=1, BorderSizePixel=0,
-            }, sf)
-            vList(container, 2)
+            local container = make("Frame", {
+                Size = UDim2.new(1, 0, 0, 0),
+                AutomaticSize = Enum.AutomaticSize.Y,
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+            }, scroll)
+            mkList(container, nil, 2)
 
-            local PL={}
+            local PL = {}
+
             function PL:Refresh()
-                for _,c in ipairs(container:GetChildren()) do
+                for _, c in ipairs(container:GetChildren()) do
                     if c:IsA("Frame") then c:Destroy() end
                 end
-                for _,p in ipairs(Players:GetPlayers()) do
-                    if p==LP then continue end
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p == LP then continue end
 
-                    local row = new("Frame", {
-                        Size=UDim2.new(1,0,0,42), BackgroundColor3=C.Row, BorderSizePixel=0,
+                    local row = make("Frame", {
+                        Size = UDim2.new(1, 0, 0, 44),
+                        BackgroundColor3 = T.PanelAlt,
+                        BorderSizePixel = 0,
                     }, container)
-                    outline(row, C.Border, 1)
+                    mkStroke(row, T.Border, 1)
 
-                    -- Avatar
-                    local av = new("ImageLabel", {
-                        Size=UDim2.new(0,30,0,30), Position=UDim2.new(0,6,0.5,-15),
-                        BackgroundColor3=C.Panel, BorderSizePixel=0,
+                    local av = make("ImageLabel", {
+                        Size = UDim2.new(0, 30, 0, 30),
+                        Position = UDim2.new(0, 6, 0.5, -15),
+                        BackgroundColor3 = T.Panel, BorderSizePixel = 0,
                     }, row)
-                    outline(av, C.Border, 1)
-                    local cp=p
+                    mkStroke(av, T.Border, 1)
+                    local cp = p
                     task.spawn(function()
-                        local ok,img=pcall(function()
+                        local ok, img = pcall(function()
                             return Players:GetUserThumbnailAsync(
                                 cp.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
                         end)
-                        if ok then av.Image=img end
+                        if ok then av.Image = img end
                     end)
 
-                    -- Name + username
-                    local nw = dual and 0.36 or 0.52
-                    new("TextLabel", {
-                        Text=p.DisplayName, TextSize=12, Font=Enum.Font.GothamBold,
-                        TextColor3=C.Text, BackgroundTransparency=1,
-                        Position=UDim2.new(0,44,0,4), Size=UDim2.new(nw,0,0,16),
-                        TextXAlignment=Enum.TextXAlignment.Left,
+                    make("TextLabel", {
+                        Text = p.DisplayName, TextSize = 12, Font = Enum.Font.GothamBold,
+                        TextColor3 = T.Text, BackgroundTransparency = 1,
+                        Position = UDim2.new(0, 44, 0, 4),
+                        Size = UDim2.new(dual and 0.38 or 0.5, 0, 0, 16),
+                        TextXAlignment = Enum.TextXAlignment.Left,
                     }, row)
-                    new("TextLabel", {
-                        Text="@"..p.Name, TextSize=10, Font=Enum.Font.Gotham,
-                        TextColor3=C.TextSub, BackgroundTransparency=1,
-                        Position=UDim2.new(0,44,0,21), Size=UDim2.new(nw,0,0,14),
-                        TextXAlignment=Enum.TextXAlignment.Left,
+
+                    make("TextLabel", {
+                        Text = "@" .. p.Name, TextSize = 10, Font = Enum.Font.Gotham,
+                        TextColor3 = T.TextDim, BackgroundTransparency = 1,
+                        Position = UDim2.new(0, 44, 0, 22),
+                        Size = UDim2.new(dual and 0.38 or 0.5, 0, 0, 14),
+                        TextXAlignment = Enum.TextXAlignment.Left,
                     }, row)
 
                     -- Button 1
-                    local bw = dual and 56 or 78
-                    local b1xOff = dual and -(bw*2+10) or -(bw+10)
-                    local b1 = new("TextButton", {
-                        Text=btn1Lbl, TextSize=10, Font=Enum.Font.GothamBold,
-                        TextColor3=C.White, BackgroundColor3=C.Accent,
-                        BorderSizePixel=0, Size=UDim2.new(0,bw,0,22),
-                        Position=UDim2.new(1,b1xOff,0.5,-11),
+                    local b1W = dual and 58 or 80
+                    local b1 = make("TextButton", {
+                        Text = btn1Label, TextSize = 10, Font = Enum.Font.GothamBold,
+                        TextColor3 = T.White, BackgroundColor3 = T.Accent,
+                        BorderSizePixel = 0,
+                        Size = UDim2.new(0, b1W, 0, 22),
+                        Position = dual
+                            and UDim2.new(1, -(b1W*2 + 16), 0.5, -11)
+                            or  UDim2.new(1, -(b1W + 10),   0.5, -11),
                     }, row)
-                    outline(b1, C.AccentDim, 1)
-                    local pp=p
-                    b1.MouseButton1Click:Connect(function() if btn1Cb then btn1Cb(pp) end end)
-                    b1.MouseEnter:Connect(function() anim(b1,{BackgroundColor3=C.AccentDim}) end)
-                    b1.MouseLeave:Connect(function() anim(b1,{BackgroundColor3=C.Accent})    end)
+                    mkStroke(b1, T.AccentDim, 1)
+
+                    local pp = p
+                    b1.MouseButton1Click:Connect(function()
+                        if btn1Cb then btn1Cb(pp) end
+                    end)
+                    b1.MouseEnter:Connect(function() tw(b1, { BackgroundColor3 = T.AccentDim }) end)
+                    b1.MouseLeave:Connect(function() tw(b1, { BackgroundColor3 = T.Accent    }) end)
 
                     -- Button 2 (optional)
                     if dual then
-                        local b2 = new("TextButton", {
-                            Text=btn2Lbl, TextSize=10, Font=Enum.Font.GothamBold,
-                            TextColor3=C.TextSub, BackgroundColor3=C.BG,
-                            BorderSizePixel=0, Size=UDim2.new(0,bw,0,22),
-                            Position=UDim2.new(1,-(bw+6),0.5,-11),
+                        local b2 = make("TextButton", {
+                            Text = btn2Label, TextSize = 10, Font = Enum.Font.GothamBold,
+                            TextColor3 = T.TextDim,
+                            BackgroundColor3 = T.BindColor,
+                            BorderSizePixel = 0,
+                            Size = UDim2.new(0, b1W, 0, 22),
+                            Position = UDim2.new(1, -(b1W + 8), 0.5, -11),
                         }, row)
-                        outline(b2, C.Border, 1)
-                        b2.MouseButton1Click:Connect(function() if btn2Cb then btn2Cb(pp) end end)
-                        b2.MouseEnter:Connect(function() anim(b2,{BackgroundColor3=C.Hover}) end)
-                        b2.MouseLeave:Connect(function() anim(b2,{BackgroundColor3=C.BG})   end)
+                        mkStroke(b2, T.Border, 1)
+
+                        b2.MouseButton1Click:Connect(function()
+                            if btn2Cb then btn2Cb(pp) end
+                        end)
+                        b2.MouseEnter:Connect(function() tw(b2, { BackgroundColor3 = T.Hover     }) end)
+                        b2.MouseLeave:Connect(function() tw(b2, { BackgroundColor3 = T.BindColor }) end)
                     end
 
-                    row.MouseEnter:Connect(function() anim(row,{BackgroundColor3=C.Hover}) end)
-                    row.MouseLeave:Connect(function() anim(row,{BackgroundColor3=C.Row})   end)
+                    row.MouseEnter:Connect(function() tw(row, { BackgroundColor3 = T.Hover    }) end)
+                    row.MouseLeave:Connect(function() tw(row, { BackgroundColor3 = T.PanelAlt }) end)
                 end
             end
 
@@ -917,54 +1132,65 @@ function VoidLib:CreateWindow(title, version)
             return PL
         end
 
-        -- SCROLL FEED
+        -- ── SCROLL FEED ─────────────────────────────────────
         function Tab:AddScrollFeed(height)
-            local feed = new("ScrollingFrame", {
-                Size=UDim2.new(1,0,0,height or 240),
-                BackgroundColor3=C.Panel, BorderSizePixel=0,
-                ScrollBarThickness=3, ScrollBarImageColor3=C.Accent,
-                CanvasSize=UDim2.new(0,0,0,0),
-                AutomaticCanvasSize=Enum.AutomaticSize.Y,
-                ScrollingDirection=Enum.ScrollingDirection.Y,
-                ElasticBehavior=Enum.ElasticBehavior.Never,
-            }, sf)
-            outline(feed, C.Border, 1)
-            padding(feed, 5,5,8,8)
-            vList(feed, 2)
+            local feed = make("ScrollingFrame", {
+                Size = UDim2.new(1, 0, 0, height or 240),
+                BackgroundColor3 = T.Panel, BorderSizePixel = 0,
+                ScrollBarThickness = 3, ScrollBarImageColor3 = T.Accent,
+                CanvasSize = UDim2.new(0,0,0,0),
+                AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                ScrollingDirection = Enum.ScrollingDirection.Y,
+                ElasticBehavior = Enum.ElasticBehavior.Never,
+            }, scroll)
+            mkStroke(feed, T.Border, 1)
+            mkPad(feed, 5, 5, 8, 8)
+            mkList(feed, nil, 2)
 
-            local F={}
-            function F:AddEntry(text, col)
-                local lbl = new("TextLabel", {
-                    Text=text, TextSize=11, Font=Enum.Font.Gotham,
-                    TextColor3=col or C.TextSub, BackgroundTransparency=1,
-                    Size=UDim2.new(1,0,0,0), AutomaticSize=Enum.AutomaticSize.Y,
-                    TextWrapped=true, TextXAlignment=Enum.TextXAlignment.Left,
+            local Feed = {}
+            function Feed:AddEntry(text, color)
+                local lbl = make("TextLabel", {
+                    Text = text, TextSize = 11, Font = Enum.Font.Gotham,
+                    TextColor3 = color or T.TextDim,
+                    BackgroundTransparency = 1,
+                    Size = UDim2.new(1, 0, 0, 0),
+                    AutomaticSize = Enum.AutomaticSize.Y,
+                    TextWrapped = true,
+                    TextXAlignment = Enum.TextXAlignment.Left,
                 }, feed)
                 task.defer(function()
                     pcall(function()
-                        feed.CanvasPosition=Vector2.new(0,feed.AbsoluteCanvasSize.Y)
+                        feed.CanvasPosition = Vector2.new(0, feed.AbsoluteCanvasSize.Y)
                     end)
                 end)
                 return lbl
             end
-            function F:Clear()
-                for _,c in ipairs(feed:GetChildren()) do
+            function Feed:Clear()
+                for _, c in ipairs(feed:GetChildren()) do
                     if c:IsA("TextLabel") then c:Destroy() end
                 end
             end
-            return F
+            return Feed
         end
 
-        -- RAW FRAME  (for custom content)
-        function Tab:AddFrame(height)
-            return new("Frame", {
-                Size=UDim2.new(1,0,0,height or 60),
-                BackgroundColor3=C.Row, BorderSizePixel=0,
-            }, sf)
+        -- ── RAW FRAME ───────────────────────────────────────
+        function Tab:AddRawFrame(height)
+            return make("Frame", {
+                Size = UDim2.new(1, 0, 0, height or 60),
+                BackgroundColor3 = T.PanelAlt, BorderSizePixel = 0,
+            }, scroll)
         end
+
+        -- backward compat alias
+        Tab.AddFrame = Tab.AddRawFrame
 
         return Tab
     end -- AddTab
+
+    -- Start on first tab
+    if #Win._contentFrames > 0 then
+        Win._contentFrames[1].Visible = true
+    end
 
     return Win
 end -- CreateWindow
