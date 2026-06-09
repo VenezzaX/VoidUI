@@ -136,7 +136,7 @@ function VoidLib:CreateWindow(title, version)
     end
 
     local WIN_W   = 660
-    local WIN_H   = 490
+    local WIN_H   = 580
     local TITLE_H = 42
     local SIDE_W  = 128
 
@@ -324,11 +324,16 @@ function VoidLib:CreateWindow(title, version)
         TextXAlignment = Enum.TextXAlignment.Left,
     }, sidebar)
 
-    local sideTabList = make("Frame", {
+    local sideTabList = make("ScrollingFrame", {
         Size = UDim2.new(1, 0, 1, -30),
         Position = UDim2.new(0, 0, 0, 30),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
+        ScrollBarThickness = 0,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        ScrollingDirection = Enum.ScrollingDirection.Y,
+        ElasticBehavior = Enum.ElasticBehavior.Never,
     }, sidebar)
     mkList(sideTabList, nil, 2)
 
