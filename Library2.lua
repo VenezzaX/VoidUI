@@ -317,6 +317,13 @@ function VoidLib:CreateWindow(title, version)
             pcall(onCloseCallback)
         end
     end)
+    win:GetPropertyChangedSignal("Visible"):Connect(function()
+        if win.Visible then
+            minimized = false
+            minBtn.Text = "─"
+            win.Size = UDim2.new(0, WIN_W, 0, WIN_H)
+        end
+    end)
     reinjectBtn.MouseButton1Click:Connect(function()
         autoReinjectEnabled = not autoReinjectEnabled
         reinjectBtn.TextColor3 = autoReinjectEnabled and T.Accent or T.TextDim
