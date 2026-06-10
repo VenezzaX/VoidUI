@@ -131,8 +131,11 @@ VoidLib.__index = VoidLib
 
 function VoidLib:CreateWindow(title, version)
     -- Remove existing
-    if CoreGui:FindFirstChild("VoidLib_" .. title) then
-        CoreGui:FindFirstChild("VoidLib_" .. title):Destroy()
+    local parent = (gethui and gethui()) or CoreGui
+    if parent:FindFirstChild("VoidLib_" .. title) then
+        pcall(function() parent:FindFirstChild("VoidLib_" .. title):Destroy() end)
+    elseif CoreGui:FindFirstChild("VoidLib_" .. title) then
+        pcall(function() CoreGui:FindFirstChild("VoidLib_" .. title):Destroy() end)
     end
 
     local WIN_W   = 660
