@@ -146,7 +146,7 @@ function VoidLib:CreateWindow(title, version)
         ResetOnSpawn   = false,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
         IgnoreGuiInset = true,
-    }, CoreGui)
+    }, (gethui and gethui()) or CoreGui)
 
     -- ── Toast Container ─────────────────────────────────────
     local toastBox = make("Frame", {
@@ -289,7 +289,12 @@ function VoidLib:CreateWindow(title, version)
     end)
     closeBtn.MouseButton1Click:Connect(function()
         tw(win, { Size = UDim2.new(0, WIN_W, 0, 0) }, 0.16)
-        task.delay(0.18, function() pcall(function() gui:Destroy() end) end)
+        task.delay(0.18, function()
+            pcall(function()
+                win.Visible = false
+                win.Size = UDim2.new(0, WIN_W, 0, WIN_H)
+            end)
+        end)
     end)
     minBtn.MouseEnter:Connect(function()  tw(minBtn,   { BackgroundColor3 = T.Hover }) end)
     minBtn.MouseLeave:Connect(function()  tw(minBtn,   { BackgroundColor3 = T.BG   }) end)
