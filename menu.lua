@@ -574,6 +574,26 @@ pcall(function()
     end)
 end)
 
+pcall(function()
+    Win:SetOnClose(function()
+        pcall(function() Win:ResetAllToggles() end)
+        
+        -- Reset non-toggle cheat properties
+        S.WalkSpeed = 16
+        S.JumpPower = 50
+        pcall(function()
+            local hum = getHum()
+            if hum then
+                hum.WalkSpeed = 16
+                hum.JumpPower = 50
+            end
+            Workspace.Gravity = 196.2
+        end)
+        
+        notify("Interface closed - all features disabled!", Color3.fromRGB(218, 38, 38))
+    end)
+end)
+
 local function teleportToPlace(placeId)
     notify("Teleporting to Place " .. placeId .. "...", Color3.fromRGB(218, 170, 42))
     setupAutoReinject()
