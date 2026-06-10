@@ -233,6 +233,23 @@ function VoidLib:CreateWindow(title, version)
         ZIndex = 4,
     }, titleBar)
 
+    -- Auto-Reinject Toggle Button
+    local autoReinjectEnabled = false
+    local autoReinjectCallback = nil
+
+    local reinjectBtn = make("TextButton", {
+        Text = "↻",
+        TextSize = 13,
+        Font = Enum.Font.GothamBold,
+        TextColor3 = T.TextDim,
+        BackgroundColor3 = T.BG,
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, 32, 0, 22),
+        Position = UDim2.new(1, -106, 0.5, -11),
+        ZIndex = 4,
+    }, titleBar)
+    mkStroke(reinjectBtn, T.Border, 1)
+
     -- Minimize
     local minBtn = make("TextButton", {
         Text = "─",
@@ -296,6 +313,16 @@ function VoidLib:CreateWindow(title, version)
             end)
         end)
     end)
+    reinjectBtn.MouseButton1Click:Connect(function()
+        autoReinjectEnabled = not autoReinjectEnabled
+        reinjectBtn.TextColor3 = autoReinjectEnabled and T.Accent or T.TextDim
+        Win:Toast("Auto-Reinject: " .. (autoReinjectEnabled and "ENABLED" or "DISABLED"), autoReinjectEnabled and T.Accent or T.TextDim)
+        if autoReinjectCallback then
+            autoReinjectCallback(autoReinjectEnabled)
+        end
+    end)
+    reinjectBtn.MouseEnter:Connect(function()  tw(reinjectBtn,  { BackgroundColor3 = T.Hover }) end)
+    reinjectBtn.MouseLeave:Connect(function()  tw(reinjectBtn,  { BackgroundColor3 = T.BG    }) end)
     minBtn.MouseEnter:Connect(function()  tw(minBtn,   { BackgroundColor3 = T.Hover }) end)
     minBtn.MouseLeave:Connect(function()  tw(minBtn,   { BackgroundColor3 = T.BG   }) end)
     closeBtn.MouseEnter:Connect(function() tw(closeBtn, { BackgroundColor3 = T.AccentDim  }) end)
@@ -406,6 +433,12 @@ function VoidLib:CreateWindow(title, version)
 
     function Win:Destroy()
         pcall(function() gui:Destroy() end)
+    end
+
+    function Win:SetAutoReinject(enabled, callback)
+        autoReinjectEnabled = enabled
+        autoReinjectCallback = callback
+        reinjectBtn.TextColor3 = enabled and T.Accent or T.TextDim
     end
 
     -- Tab switch
