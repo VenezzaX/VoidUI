@@ -18,7 +18,7 @@ elseif isfile and isfile("Library.lua") then
     VoidLib = loadstring(readfile("Library.lua"))()
 else
     VoidLib = loadstring(game:HttpGet(
-        "https://raw.githubusercontent.com/VenezzaX/VoidUI/refs/heads/main/Library2.lua"
+        "https://raw.githubusercontent.com/VenezzaX/VoidUI/refs/heads/main/Library.lua"
     ))()
 end
 
@@ -501,7 +501,7 @@ local function setupAutoRejoin()
     end)
 end
 
-local queue_on_teleport = queue_on_teleport or (syn and syn.queue_on_teleport) or queue_to_teleport or (fluxus and fluxus.queue_on_teleport)
+local queue_on_teleport = queue_on_teleport or queueteleport or (syn and syn.queue_on_teleport) or queue_to_teleport or (fluxus and fluxus.queue_on_teleport)
 local function setupAutoReinject()
     local code = [[
         repeat task.wait() until game:IsLoaded()
@@ -509,8 +509,16 @@ local function setupAutoReinject()
         repeat
             task.wait(0.1)
         until (isfile and readfile) or (tick() - start > 10)
+        
         if isfile and isfile("Script.lua") then
             loadstring(readfile("Script.lua"))()
+        else
+            local ok, err = pcall(function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/VenezzaX/VoidUI/refs/heads/main/menu.lua", true))()
+            end)
+            if not ok then
+                warn("Void Utility Hub auto-reinject failed: " .. tostring(err))
+            end
         end
     ]]
 
