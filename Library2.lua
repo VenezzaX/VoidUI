@@ -298,12 +298,17 @@ function VoidLib:CreateWindow(title, version)
 
     -- ── Minimize / Close ────────────────────────────────────
     local minimized = false
+    local resetAllScrolls
+
     minBtn.MouseButton1Click:Connect(function()
         minimized = not minimized
         tw(win, { Size = minimized
             and UDim2.new(0, WIN_W, 0, TITLE_H)
             or  UDim2.new(0, WIN_W, 0, WIN_H) }, 0.2)
         minBtn.Text = minimized and "□" or "─"
+        if not minimized and resetAllScrolls then
+            task.delay(0.22, resetAllScrolls)
+        end
     end)
     closeBtn.MouseButton1Click:Connect(function()
         tw(win, { Size = UDim2.new(0, WIN_W, 0, 0) }, 0.16)
@@ -322,6 +327,9 @@ function VoidLib:CreateWindow(title, version)
             minimized = false
             minBtn.Text = "─"
             win.Size = UDim2.new(0, WIN_W, 0, WIN_H)
+            if resetAllScrolls then
+                task.delay(0.22, resetAllScrolls)
+            end
         end
     end)
     reinjectBtn.MouseButton1Click:Connect(function()
@@ -406,6 +414,20 @@ function VoidLib:CreateWindow(title, version)
         _gui           = gui,
         HUDLabel       = hudLabel,
     }
+
+    resetAllScrolls = function()
+        pcall(function()
+            sideTabList.CanvasPosition = Vector2.new(0, 0)
+        end)
+        for _, cf in ipairs(Win._contentFrames) do
+            pcall(function()
+                local scroll = cf:FindFirstChildOfClass("ScrollingFrame")
+                if scroll then
+                    scroll.CanvasPosition = Vector2.new(0, 0)
+                end
+            end)
+        end
+    end
 
     -- Toast
     function Win:Toast(msg, color)
