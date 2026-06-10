@@ -236,6 +236,7 @@ function VoidLib:CreateWindow(title, version)
     -- Auto-Reinject Toggle Button
     local autoReinjectEnabled = false
     local autoReinjectCallback = nil
+    local onCloseCallback = nil
 
     local reinjectBtn = make("TextButton", {
         Text = "↻",
@@ -312,6 +313,9 @@ function VoidLib:CreateWindow(title, version)
                 win.Size = UDim2.new(0, WIN_W, 0, WIN_H)
             end)
         end)
+        if onCloseCallback then
+            pcall(onCloseCallback)
+        end
     end)
     reinjectBtn.MouseButton1Click:Connect(function()
         autoReinjectEnabled = not autoReinjectEnabled
@@ -391,6 +395,7 @@ function VoidLib:CreateWindow(title, version)
         _tabAccents    = {},
         _contentFrames = {},
         _tabs          = {},
+        _toggles       = {},
         _gui           = gui,
         HUDLabel       = hudLabel,
     }
@@ -433,6 +438,23 @@ function VoidLib:CreateWindow(title, version)
 
     function Win:Destroy()
         pcall(function() gui:Destroy() end)
+    end
+
+    function Win:SetOnClose(callback)
+        onCloseCallback = callback
+    end
+
+    function Win:ResetAllToggles()
+        for _, toggle in ipairs(self._toggles) do
+            local labelText = toggle._label and toggle._label.Text or ""
+            local labelLower = labelText:lower()
+            local isConfig = labelLower:find("afk") or labelLower:find("rejoin") or labelLower:find("reinject") or labelLower:find("toast") or labelLower:find("shift lock") or labelLower:find("coordinates") or labelLower:find("waypoint") or labelLower:find("lag reducer") or labelLower:find("anti-afk")
+            if not isConfig then
+                pcall(function()
+                    toggle:Set(false)
+                end)
+            end
+        end
     end
 
     function Win:SetAutoReinject(enabled, callback)
@@ -582,7 +604,7 @@ function VoidLib:CreateWindow(title, version)
                 BorderSizePixel = 0,
             }, row)
 
-            make("TextLabel", {
+            local labelLabel = make("TextLabel", {
                 Text = label,
                 TextSize = 12,
                 Font = Enum.Font.GothamBold,
@@ -618,7 +640,8 @@ function VoidLib:CreateWindow(title, version)
                 Size = UDim2.new(1,0,1,0), ZIndex = 2,
             }, row)
 
-            local Toggle = { Value = state }
+            local Toggle = { Value = state, _label = labelLabel }
+            table.insert(self._win._toggles, Toggle)
 
             local function applyToggle(v)
                 Toggle.Value = v
