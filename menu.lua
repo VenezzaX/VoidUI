@@ -17,9 +17,16 @@ if isfile and isfile("Library2.lua") then
 elseif isfile and isfile("Library.lua") then
     VoidLib = loadstring(readfile("Library.lua"))()
 else
-    VoidLib = loadstring(game:HttpGet(
-        "https://raw.githubusercontent.com/VenezzaX/VoidUI/refs/heads/main/Library.lua"
-    ))()
+    local ok, res = pcall(function()
+        return game:HttpGet("https://raw.githubusercontent.com/VenezzaX/VoidUI/refs/heads/main/Library2.lua")
+    end)
+    if ok and res and res ~= "" and not res:find("404") and not res:find("not found") then
+        VoidLib = loadstring(res)()
+    else
+        VoidLib = loadstring(game:HttpGet(
+            "https://raw.githubusercontent.com/VenezzaX/VoidUI/refs/heads/main/Library.lua"
+        ))()
+    end
 end
 
 -- ──────────────────────────────────────────────────────────────
