@@ -51,6 +51,12 @@ local uiVisible = true
 local windowFrame = nil
 local notify = nil
 local autoReinjectToggle = nil
+local isFreecam = false
+local freecamConnection = nil
+local freecamInputConn = nil
+local freecamInputBeganConn = nil
+local freecamInputEndedConn = nil
+local freecamBasePos = nil
 
 -- ──────────────────────────────────────────────────────────────
 --  STATE CONFIGURATION
@@ -210,7 +216,7 @@ end
 
 local function restoreHitbox(p)
     local char = p.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char.PrimaryPart)
     if hrp then
         local adorn = hrp:FindFirstChild("VoidHitboxAdorn")
         if adorn then pcall(function() adorn:Destroy() end) end
@@ -275,6 +281,25 @@ local function cleanupAll()
     end
 
     pcall(function()
+        if isFreecam then
+            isFreecam = false
+            local char = LP.Character
+            local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char.PrimaryPart)
+            if hrp then hrp.Anchored = false end
+            
+            if freecamConnection then freecamConnection:Disconnect() freecamConnection = nil end
+            if freecamInputConn then freecamInputConn:Disconnect() freecamInputConn = nil end
+            if freecamInputBeganConn then freecamInputBeganConn:Disconnect() freecamInputBeganConn = nil end
+            if freecamInputEndedConn then freecamInputEndedConn:Disconnect() freecamInputEndedConn = nil end
+            
+            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+            Camera.CameraType = Enum.CameraType.Custom
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then Camera.CameraSubject = hum end
+        end
+    end)
+
+    pcall(function()
         if LP.Character then
             revertTallAnimations(LP.Character)
             disableGodMode()
@@ -309,7 +334,7 @@ getgenv().VoidUtilityHubCleanup = cleanupAll
 local function getChar() return LP.Character end
 local function getHRP()
     local c = getChar()
-    return c and (c:FindFirstChild("HumanoidRootPart") or c.PrimaryPart)
+    return c and (c:FindFirstChild("HumanoidRootPart") or c:FindFirstChild("Torso") or c.PrimaryPart)
 end
 local function getHum()
     local c = getChar()
@@ -880,7 +905,7 @@ visualTab:AddSection("OVERHEAD HEADS-UP DISPLAY")
 local function makeOverhead(p)
     if p == LP then return end
     local char = p.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char.PrimaryPart)
     if not hrp then return end
     
     if S.OverheadPool[p] then
@@ -971,7 +996,7 @@ visualTab:AddSection("HITBOX EXPANSION")
 local function applyHitbox(p)
     if p == LP then return end
     local char = p.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char.PrimaryPart)
     if not hrp then return end
     
     if S.HitboxTeamCheck and p.Team == LP.Team then
@@ -1123,67 +1148,6 @@ fovCircle.Filled = false
 fovCircle.Transparency = 1
 getgenv().VoidFOVCircle = fovCircle
 
-combatTab:AddButton("Fling Targeted Player", "FLING", function()
-    if not flingSelectPlayer then
-        notify("Select a player first!", Color3.fromRGB(218, 38, 38))
-        return
-    end
-    
-    local myChar = LP.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    local tgtChar = flingSelectPlayer.Character
-    local tgtHRP = tgtChar and tgtChar:FindFirstChild("HumanoidRootPart")
-    
-    if not myHRP or not tgtHRP then
-        notify("Character or target root not loaded!", Color3.fromRGB(218, 38, 38))
-        return
-    end
-    
-    local originalCF = myHRP.CFrame
-    S.FlingActive = true
-    notify("Initiating fling on target...", Color3.fromRGB(218, 170, 42))
-    
-    local myHum = myChar:FindFirstChildOfClass("Humanoid")
-    if myHum then myHum:ChangeState(Enum.HumanoidStateType.Physics) end
-    
-    local disableCollisions
-    disableCollisions = RunService.Stepped:Connect(function()
-        if not S.FlingActive or not myChar then
-            disableCollisions:Disconnect()
-            return
-        end
-        for _, p in ipairs(myChar:GetDescendants()) do
-            if p:IsA("BasePart") then
-                if p.Name == "HumanoidRootPart" then
-                    p.CanCollide = true
-                else
-                    p.CanCollide = false
-                end
-            end
-        end
-    end)
-    
-    task.spawn(function()
-        local startT = tick()
-        while tick() - startT < 3.5 and S.FlingActive and tgtHRP and tgtHRP.Parent and myHRP and myHRP.Parent do
-            local angle = tick() * 30
-            local offset = Vector3.new(math.sin(angle) * 1.2, 0.1, math.cos(angle) * 1.2)
-            myHRP.CFrame = CFrame.new(tgtHRP.Position + offset + (tgtHRP.Velocity * 0.12))
-            myHRP.AssemblyLinearVelocity = Vector3.new(10000, 10000, 10000)
-            myHRP.AssemblyAngularVelocity = Vector3.new(0, 50000, 0)
-            task.wait()
-        end
-        S.FlingActive = false
-        if myHRP and myHRP.Parent then
-            myHRP.AssemblyLinearVelocity = Vector3.zero
-            myHRP.AssemblyAngularVelocity = Vector3.zero
-            myHRP.CFrame = originalCF
-        end
-        if myHum and myHum.Parent then myHum:ChangeState(Enum.HumanoidStateType.GettingUp) end
-        notify("Fling process complete", Color3.fromRGB(50, 195, 75))
-    end)
-end)
-
 -- ──────────────────────────────────────────────────────────────
 --  TAB 4 ▸ MOVEMENT
 -- ──────────────────────────────────────────────────────────────
@@ -1301,120 +1265,6 @@ local ghostTpToggle = moveTab:AddToggle("Teleport to Ghost End Position", S.Ghos
     saveConfig()
 end)
 
-moveTab:AddSection("TELEPORT & WATCH UTILITIES")
-local tpSelectPlayer = nil
-local tpDrop = moveTab:AddDropdown("Target Teleport Player", {"(none)"}, 1, function(_, opt)
-    tpSelectPlayer = nil
-    for _, p in ipairs(Players:GetPlayers()) do
-        local formatName = p.DisplayName .. " (@" .. p.Name .. ")"
-        if formatName == opt then
-            tpSelectPlayer = p
-            break
-        end
-    end
-end)
-
-local function refreshPlayerDropdowns()
-    local list = {"(none)"}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP then
-            table.insert(list, p.DisplayName .. " (@" .. p.Name .. ")")
-        end
-    end
-    
-    local oldTP = tpSelectPlayer
-    if tpDrop then
-        tpDrop:SetOptions(list)
-        local formattedOld = oldTP and (oldTP.DisplayName .. " (@" .. oldTP.Name .. ")")
-        if formattedOld and table.find(list, formattedOld) then
-            tpSelectPlayer = oldTP
-        else
-            tpSelectPlayer = nil
-        end
-    end
-    
-    local oldFling = flingSelectPlayer
-    if flingDrop then
-        flingDrop:SetOptions(list)
-        local formattedOld = oldFling and (oldFling.DisplayName .. " (@" .. oldFling.Name .. ")")
-        if formattedOld and table.find(list, formattedOld) then
-            flingSelectPlayer = oldFling
-        else
-            flingSelectPlayer = nil
-        end
-    end
-end
-table.insert(S.Connections, Players.PlayerAdded:Connect(refreshPlayerDropdowns))
-table.insert(S.Connections, Players.PlayerRemoving:Connect(refreshPlayerDropdowns))
-refreshPlayerDropdowns()
-
-moveTab:AddButton("Teleport To Target", "WARP", function()
-    local tgtHRP = tpSelectPlayer and tpSelectPlayer.Character and tpSelectPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if tgtHRP and teleportToHRP(tgtHRP) then
-        notify("Warped to " .. tpSelectPlayer.DisplayName, Color3.fromRGB(50, 195, 75))
-    else
-        notify("Warp Target not available", Color3.fromRGB(218, 38, 38))
-    end
-end)
-moveTab:AddButton("Teleport to Nearest Player", "NEAREST", function()
-    local myHRP = getHRP()
-    if not myHRP then
-        notify("Self root part not found!", Color3.fromRGB(218, 38, 38))
-        return
-    end
-    local nearest = nil
-    local shortestDist = math.huge
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local dist = (p.Character.HumanoidRootPart.Position - myHRP.Position).Magnitude
-            if dist < shortestDist then
-                shortestDist = dist
-                nearest = p
-            end
-        end
-    end
-    if nearest then
-        local targetHRP = nearest.Character.HumanoidRootPart
-        if teleportToHRP(targetHRP) then
-            notify("Teleported to nearest: " .. nearest.DisplayName .. string.format(" (%.1f studs)", shortestDist), Color3.fromRGB(50, 195, 75))
-        end
-    else
-        notify("No other players found nearby", Color3.fromRGB(218, 38, 38))
-    end
-end)
-moveTab:AddButton("Teleport to Random Player", "RANDOM", function()
-    local list = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            table.insert(list, p)
-        end
-    end
-    if #list > 0 then
-        local chosen = list[math.random(1, #list)]
-        local targetHRP = chosen.Character.HumanoidRootPart
-        if teleportToHRP(targetHRP) then
-            notify("Teleported to random: " .. chosen.DisplayName, Color3.fromRGB(50, 195, 75))
-        end
-    else
-        notify("No alternative player found to teleport to", Color3.fromRGB(218, 38, 38))
-    end
-end)
-
-moveTab:AddButton("Watch Player Camera", "SPECTATE", function()
-    if not tpSelectPlayer then
-        notify("Select target first!", Color3.fromRGB(218, 38, 38))
-        return
-    end
-    spectatePlayer(tpSelectPlayer)
-end)
-
-local followToggle = moveTab:AddToggle("Auto Follow Player", S.FollowActive, function(v)
-    S.FollowActive = v
-    S.FollowTarget = tpSelectPlayer
-    if v then notify("Following Target", Color3.fromRGB(218, 170, 42)) end
-    saveConfig()
-end)
-
 moveTab:AddSection("ADVANCED PHYSICAL MODIFIERS")
 moveTab:AddToggle("Float Mode (Float in Place)", S.Float, function(v)
     toggleFloat(v)
@@ -1475,8 +1325,8 @@ local specTeamRow = playersTab:AddInfoRow("Target Team", "--")
 
 local spectateIndex = 1
 local isSpectating = false
-local isFreecam = false
-local freecamConnection = nil
+isFreecam = false
+freecamConnection = nil
 
 local function getSpectateList()
     local list = {}
@@ -1501,8 +1351,8 @@ end
 
 local camYaw = 0
 local camPitch = 0
-local freecamInputConn = nil
-local freecamBasePos = nil
+freecamInputConn = nil
+freecamBasePos = nil
 
 local function getFreecamBasis()
     local rot = CFrame.fromOrientation(camPitch, camYaw, 0)
@@ -1519,6 +1369,12 @@ end
 
 local function enableFreecam()
     isFreecam = true
+    
+    local hrp = getHRP()
+    if hrp then
+        hrp.Anchored = true
+    end
+
     Camera.CameraType = Enum.CameraType.Scriptable
     freecamBasePos = Camera.CFrame.Position
     notify("Freecam active. Hold Right-Click to look around. WASD to move.", Color3.fromRGB(50, 195, 75))
@@ -1527,10 +1383,26 @@ local function enableFreecam()
     camYaw = yaw
     camPitch = pitch
 
-    if freecamInputConn then
-        freecamInputConn:Disconnect()
-        freecamInputConn = nil
+    if freecamInputConn then freecamInputConn:Disconnect() freecamInputConn = nil end
+    if freecamInputBeganConn then freecamInputBeganConn:Disconnect() freecamInputBeganConn = nil end
+    if freecamInputEndedConn then freecamInputEndedConn:Disconnect() freecamInputEndedConn = nil end
+
+    if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
     end
+
+    freecamInputBeganConn = UserInputService.InputBegan:Connect(function(input, gpe)
+        if not isFreecam then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+        end
+    end)
+
+    freecamInputEndedConn = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+        end
+    end)
 
     freecamInputConn = UserInputService.InputChanged:Connect(function(input)
         if not isFreecam then return end
@@ -1548,6 +1420,11 @@ local function enableFreecam()
 
     freecamConnection = RunService.RenderStepped:Connect(function(dt)
         if not isFreecam then return end
+
+        local hrp = getHRP()
+        if hrp and not hrp.Anchored then
+            hrp.Anchored = true
+        end
 
         local rot, flatForward, flatRight = getFreecamBasis()
         local dir = Vector3.zero
@@ -1574,8 +1451,18 @@ end
 
 local function disableFreecam()
     isFreecam = false
+    
+    local hrp = getHRP()
+    if hrp then
+        hrp.Anchored = false
+    end
+
     if freecamConnection then freecamConnection:Disconnect() freecamConnection = nil end
     if freecamInputConn then freecamInputConn:Disconnect() freecamInputConn = nil end
+    if freecamInputBeganConn then freecamInputBeganConn:Disconnect() freecamInputBeganConn = nil end
+    if freecamInputEndedConn then freecamInputEndedConn:Disconnect() freecamInputEndedConn = nil end
+    
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
     freecamBasePos = nil
     Camera.CameraType = Enum.CameraType.Custom
     local hum = getHum()
@@ -1592,169 +1479,6 @@ playersTab:AddSlider("Freecam Flight Speed", 10, 300, S.FreecamSpeed, function(v
     S.FreecamSpeed = v
     saveConfig()
 end)
-
-playersTab:AddSection("PLAYER FLING SYSTEM")
-local flingSelectPlayer = nil
-local flingDrop = playersTab:AddDropdown("Select Player", {"(none)"}, 1, function(_, opt)
-    flingSelectPlayer = nil
-    for _, p in ipairs(Players:GetPlayers()) do
-        local formatName = p.DisplayName .. " (@" .. p.Name .. ")"
-        if formatName == opt then
-            flingSelectPlayer = p
-            break
-        end
-    end
-end)
-
-local function refreshFlingDropdown(filter)
-    local list = {"(none)"}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP then
-            local matches = true
-            if filter and filter ~= "" then
-                matches = p.Name:lower():find(filter:lower()) or p.DisplayName:lower():find(filter:lower())
-            end
-            if matches then
-                table.insert(list, p.DisplayName .. " (@" .. p.Name .. ")")
-            end
-        end
-    end
-    
-    local oldFling = flingSelectPlayer
-    if flingDrop then
-        flingDrop:SetOptions(list)
-        local formattedOld = oldFling and (oldFling.DisplayName .. " (@" .. oldFling.Name .. ")")
-        if formattedOld and table.find(list, formattedOld) then
-            flingSelectPlayer = oldFling
-        else
-            flingSelectPlayer = nil
-        end
-    end
-end
-
-local flingSearchInput = playersTab:AddTextInput("Search Target Name", "SEARCH", function(txt)
-    refreshFlingDropdown(txt)
-end)
-
-playersTab:AddButton("Fling All Players", "FLING ALL", function()
-    notify("Flinging all players...", Color3.fromRGB(218, 170, 42))
-    task.spawn(function()
-        local myChar = LP.Character
-        local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-        local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
-        if not myHRP or not myHum then return end
-        local originalCF = myHRP.CFrame
-        local disableCollisions
-        disableCollisions = RunService.Stepped:Connect(function()
-            if not S.FlingActive or not myChar then
-                disableCollisions:Disconnect()
-                return
-            end
-            for _, p in ipairs(myChar:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    p.CanCollide = (p.Name == "HumanoidRootPart")
-                end
-            end
-        end)
-        S.FlingActive = true
-        myHum:ChangeState(Enum.HumanoidStateType.Physics)
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local targetHRP = p.Character.HumanoidRootPart
-                local startT = tick()
-                while tick() - startT < 0.8 and S.FlingActive and targetHRP and targetHRP.Parent and myHRP and myHRP.Parent do
-                    myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 1)
-                    myHRP.AssemblyLinearVelocity = Vector3.new(10000, 10000, 10000)
-                    myHRP.AssemblyAngularVelocity = Vector3.new(0, 50000, 0)
-                    task.wait()
-                end
-            end
-        end
-        S.FlingActive = false
-        if myHRP and myHRP.Parent then
-            myHRP.AssemblyLinearVelocity = Vector3.zero
-            myHRP.AssemblyAngularVelocity = Vector3.zero
-            myHRP.CFrame = originalCF
-        end
-        if myHum and myHum.Parent then myHum:ChangeState(Enum.HumanoidStateType.GettingUp) end
-        notify("Fling All process complete", Color3.fromRGB(50, 195, 75))
-    end)
-end)
-
-playerCards = {}
-local currentSpectateTarget = nil
-
-local function resetCameraToSelf()
-    currentSpectateTarget = nil
-    isSpectating = false
-
-    if freecamConnection then freecamConnection:Disconnect() freecamConnection = nil end
-    if freecamInputConn then freecamInputConn:Disconnect() freecamInputConn = nil end
-    isFreecam = false
-    freecamBasePos = nil
-
-    Camera.CameraType = Enum.CameraType.Custom
-    local hum = getHum()
-    if hum then
-        Camera.CameraSubject = hum
-    end
-
-    specNameRow:SetValue("--")
-    specHpRow:SetValue("--")
-    specTeamRow:SetValue("--")
-    specNameRow:SetColor(Color3.fromRGB(235, 235, 235))
-
-    for _, item in pairs(playerCards) do
-        if item.ViewBtn then
-            item.ViewBtn.Text = "VIEW"
-            item.ViewBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-        end
-        if item.UIStroke then
-            item.UIStroke.Color = Color3.fromRGB(34, 34, 34)
-        end
-    end
-end
-
-local function spectatePlayer(targetPlayer)
-    if not targetPlayer then
-        resetCameraToSelf()
-        return
-    end
-
-    if isFreecam then
-        disableFreecam()
-    end
-
-    local hum = targetPlayer.Character and targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-    if hum then
-        currentSpectateTarget = targetPlayer
-        isSpectating = true
-        Camera.CameraType = Enum.CameraType.Watch
-        Camera.CameraSubject = hum
-        notify("Viewing " .. targetPlayer.DisplayName, Color3.fromRGB(218, 170, 42))
-
-        for p, item in pairs(playerCards) do
-            if item.ViewBtn then
-                if p == targetPlayer then
-                    item.ViewBtn.Text = "UNVIEW"
-                    item.ViewBtn.BackgroundColor3 = Color3.fromRGB(218, 38, 38)
-                    if item.UIStroke then
-                        item.UIStroke.Color = Color3.fromRGB(130, 20, 20)
-                    end
-                else
-                    item.ViewBtn.Text = "VIEW"
-                    item.ViewBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-                    if item.UIStroke then
-                        item.UIStroke.Color = Color3.fromRGB(34, 34, 34)
-                    end
-                end
-            end
-        end
-    else
-        notify("Target humanoid not loaded!", Color3.fromRGB(218, 38, 38))
-        resetCameraToSelf()
-    end
-end
 
 playersTab:AddSection("ENHANCED PLAYER UTILITY LIST")
 local listOuterFrame = playersTab:AddFrame(220)
@@ -2040,6 +1764,350 @@ end))
 rebuildPlayerList()
 
 playersTab:AddButton("Manually Rebuild Player List", "REFRESH", rebuildPlayerList)
+
+playersTab:AddSection("PLAYER FLING SYSTEM")
+local flingSelectPlayer = nil
+local flingDrop = playersTab:AddDropdown("Select Player", {"(none)"}, 1, function(_, opt)
+    flingSelectPlayer = nil
+    for _, p in ipairs(Players:GetPlayers()) do
+        local formatName = p.DisplayName .. " (@" .. p.Name .. ")"
+        if formatName == opt then
+            flingSelectPlayer = p
+            break
+        end
+    end
+end)
+
+local function refreshFlingDropdown(filter)
+    local list = {"(none)"}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP then
+            local matches = true
+            if filter and filter ~= "" then
+                matches = p.Name:lower():find(filter:lower()) or p.DisplayName:lower():find(filter:lower())
+            end
+            if matches then
+                table.insert(list, p.DisplayName .. " (@" .. p.Name .. ")")
+            end
+        end
+    end
+    
+    local oldFling = flingSelectPlayer
+    if flingDrop then
+        flingDrop:SetOptions(list)
+        local formattedOld = oldFling and (oldFling.DisplayName .. " (@" .. oldFling.Name .. ")")
+        if formattedOld and table.find(list, formattedOld) then
+            flingSelectPlayer = oldFling
+        else
+            flingSelectPlayer = nil
+        end
+    end
+end
+
+local flingSearchInput = playersTab:AddTextInput("Search Target Name", "SEARCH", function(txt)
+    refreshFlingDropdown(txt)
+end)
+
+playersTab:AddButton("Fling Targeted Player", "FLING", function()
+    if not flingSelectPlayer then
+        notify("Select a player first!", Color3.fromRGB(218, 38, 38))
+        return
+    end
+    
+    local myChar = LP.Character
+    local myHRP = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso") or myChar.PrimaryPart)
+    local tgtChar = flingSelectPlayer.Character
+    local tgtHRP = tgtChar and (tgtChar:FindFirstChild("HumanoidRootPart") or tgtChar:FindFirstChild("Torso") or tgtChar.PrimaryPart)
+    
+    if not myHRP or not tgtHRP then
+        notify("Character or target root not loaded!", Color3.fromRGB(218, 38, 38))
+        return
+    end
+    
+    local originalCF = myHRP.CFrame
+    S.FlingActive = true
+    notify("Initiating fling on target...", Color3.fromRGB(218, 170, 42))
+    
+    local myHum = myChar:FindFirstChildOfClass("Humanoid")
+    if myHum then myHum:ChangeState(Enum.HumanoidStateType.Physics) end
+    
+    local disableCollisions
+    disableCollisions = RunService.Stepped:Connect(function()
+        if not S.FlingActive or not myChar then
+            disableCollisions:Disconnect()
+            return
+        end
+        for _, p in ipairs(myChar:GetDescendants()) do
+            if p:IsA("BasePart") then
+                if p.Name == "HumanoidRootPart" then
+                    p.CanCollide = true
+                else
+                    p.CanCollide = false
+                end
+            end
+        end
+    end)
+    
+    task.spawn(function()
+        local startT = tick()
+        while tick() - startT < 3.5 and S.FlingActive and tgtHRP and tgtHRP.Parent and myHRP and myHRP.Parent do
+            local angle = tick() * 30
+            local offset = Vector3.new(math.sin(angle) * 1.2, 0.1, math.cos(angle) * 1.2)
+            myHRP.CFrame = CFrame.new(tgtHRP.Position + offset + (tgtHRP.Velocity * 0.12))
+            myHRP.AssemblyLinearVelocity = Vector3.new(10000, 10000, 10000)
+            myHRP.AssemblyAngularVelocity = Vector3.new(0, 50000, 0)
+            task.wait()
+        end
+        S.FlingActive = false
+        if myHRP and myHRP.Parent then
+            myHRP.AssemblyLinearVelocity = Vector3.zero
+            myHRP.AssemblyAngularVelocity = Vector3.zero
+            myHRP.CFrame = originalCF
+        end
+        if myHum and myHum.Parent then myHum:ChangeState(Enum.HumanoidStateType.GettingUp) end
+        notify("Fling process complete", Color3.fromRGB(50, 195, 75))
+    end)
+end)
+
+playersTab:AddButton("Fling All Players", "FLING ALL", function()
+    notify("Flinging all players...", Color3.fromRGB(218, 170, 42))
+    task.spawn(function()
+        local myChar = LP.Character
+        local myHRP = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso") or myChar.PrimaryPart)
+        local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+        if not myHRP or not myHum then return end
+        local originalCF = myHRP.CFrame
+        local disableCollisions
+        disableCollisions = RunService.Stepped:Connect(function()
+            if not S.FlingActive or not myChar then
+                disableCollisions:Disconnect()
+                return
+            end
+            for _, p in ipairs(myChar:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    p.CanCollide = (p.Name == "HumanoidRootPart")
+                end
+            end
+        end)
+        S.FlingActive = true
+        myHum:ChangeState(Enum.HumanoidStateType.Physics)
+        for _, p in ipairs(Players:GetPlayers()) do
+            local targetHRP = p.Character and (p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso") or p.Character.PrimaryPart)
+            if p ~= LP and p.Character and targetHRP then
+                local startT = tick()
+                while tick() - startT < 0.8 and S.FlingActive and targetHRP and targetHRP.Parent and myHRP and myHRP.Parent do
+                    myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 1)
+                    myHRP.AssemblyLinearVelocity = Vector3.new(10000, 10000, 10000)
+                    myHRP.AssemblyAngularVelocity = Vector3.new(0, 50000, 0)
+                    task.wait()
+                end
+            end
+        end
+        S.FlingActive = false
+        if myHRP and myHRP.Parent then
+            myHRP.AssemblyLinearVelocity = Vector3.zero
+            myHRP.AssemblyAngularVelocity = Vector3.zero
+            myHRP.CFrame = originalCF
+        end
+        if myHum and myHum.Parent then myHum:ChangeState(Enum.HumanoidStateType.GettingUp) end
+        notify("Fling All process complete", Color3.fromRGB(50, 195, 75))
+    end)
+end)
+
+playerCards = {}
+local currentSpectateTarget = nil
+
+local function resetCameraToSelf()
+    currentSpectateTarget = nil
+    isSpectating = false
+
+    if freecamConnection then freecamConnection:Disconnect() freecamConnection = nil end
+    if freecamInputConn then freecamInputConn:Disconnect() freecamInputConn = nil end
+    isFreecam = false
+    freecamBasePos = nil
+
+    Camera.CameraType = Enum.CameraType.Custom
+    local hum = getHum()
+    if hum then
+        Camera.CameraSubject = hum
+    end
+
+    specNameRow:SetValue("--")
+    specHpRow:SetValue("--")
+    specTeamRow:SetValue("--")
+    specNameRow:SetColor(Color3.fromRGB(235, 235, 235))
+
+    for _, item in pairs(playerCards) do
+        if item.ViewBtn then
+            item.ViewBtn.Text = "VIEW"
+            item.ViewBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+        end
+        if item.UIStroke then
+            item.UIStroke.Color = Color3.fromRGB(34, 34, 34)
+        end
+    end
+end
+
+local function spectatePlayer(targetPlayer)
+    if not targetPlayer then
+        resetCameraToSelf()
+        return
+    end
+
+    if isFreecam then
+        disableFreecam()
+    end
+
+    local hum = targetPlayer.Character and targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        currentSpectateTarget = targetPlayer
+        isSpectating = true
+        Camera.CameraType = Enum.CameraType.Watch
+        Camera.CameraSubject = hum
+        notify("Viewing " .. targetPlayer.DisplayName, Color3.fromRGB(218, 170, 42))
+
+        for p, item in pairs(playerCards) do
+            if item.ViewBtn then
+                if p == targetPlayer then
+                    item.ViewBtn.Text = "UNVIEW"
+                    item.ViewBtn.BackgroundColor3 = Color3.fromRGB(218, 38, 38)
+                    if item.UIStroke then
+                        item.UIStroke.Color = Color3.fromRGB(130, 20, 20)
+                    end
+                else
+                    item.ViewBtn.Text = "VIEW"
+                    item.ViewBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+                    if item.UIStroke then
+                        item.UIStroke.Color = Color3.fromRGB(34, 34, 34)
+                    end
+                end
+            end
+        end
+    else
+        notify("Target humanoid not loaded!", Color3.fromRGB(218, 38, 38))
+        resetCameraToSelf()
+    end
+end
+
+playersTab:AddSection("TELEPORT & WATCH UTILITIES")
+local tpSelectPlayer = nil
+local tpDrop = playersTab:AddDropdown("Target Teleport Player", {"(none)"}, 1, function(_, opt)
+    tpSelectPlayer = nil
+    for _, p in ipairs(Players:GetPlayers()) do
+        local formatName = p.DisplayName .. " (@" .. p.Name .. ")"
+        if formatName == opt then
+            tpSelectPlayer = p
+            break
+        end
+    end
+end)
+
+local function refreshPlayerDropdowns()
+    local list = {"(none)"}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP then
+            table.insert(list, p.DisplayName .. " (@" .. p.Name .. ")")
+        end
+    end
+    
+    local oldTP = tpSelectPlayer
+    if tpDrop then
+        tpDrop:SetOptions(list)
+        local formattedOld = oldTP and (oldTP.DisplayName .. " (@" .. oldTP.Name .. ")")
+        if formattedOld and table.find(list, formattedOld) then
+            tpSelectPlayer = oldTP
+        else
+            tpSelectPlayer = nil
+        end
+    end
+    
+    local oldFling = flingSelectPlayer
+    if flingDrop then
+        flingDrop:SetOptions(list)
+        local formattedOld = oldFling and (oldFling.DisplayName .. " (@" .. oldFling.Name .. ")")
+        if formattedOld and table.find(list, formattedOld) then
+            flingSelectPlayer = oldFling
+        else
+            flingSelectPlayer = nil
+        end
+    end
+end
+table.insert(S.Connections, Players.PlayerAdded:Connect(refreshPlayerDropdowns))
+table.insert(S.Connections, Players.PlayerRemoving:Connect(refreshPlayerDropdowns))
+refreshPlayerDropdowns()
+
+playersTab:AddButton("Teleport To Target", "WARP", function()
+    local tgtHRP = tpSelectPlayer and tpSelectPlayer.Character and (tpSelectPlayer.Character:FindFirstChild("HumanoidRootPart") or tpSelectPlayer.Character:FindFirstChild("Torso") or tpSelectPlayer.Character.PrimaryPart)
+    if tgtHRP and teleportToHRP(tgtHRP) then
+        notify("Warped to " .. tpSelectPlayer.DisplayName, Color3.fromRGB(50, 195, 75))
+    else
+        notify("Warp Target not available", Color3.fromRGB(218, 38, 38))
+    end
+end)
+playersTab:AddButton("Teleport to Nearest Player", "NEAREST", function()
+    local myHRP = getHRP()
+    if not myHRP then
+        notify("Self root part not found!", Color3.fromRGB(218, 38, 38))
+        return
+    end
+    local nearest = nil
+    local shortestDist = math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local root = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso") or p.Character.PrimaryPart
+            if root then
+                local dist = (root.Position - myHRP.Position).Magnitude
+                if dist < shortestDist then
+                    shortestDist = dist
+                    nearest = p
+                end
+            end
+        end
+    end
+    if nearest then
+        local targetHRP = nearest.Character:FindFirstChild("HumanoidRootPart") or nearest.Character:FindFirstChild("Torso") or nearest.Character.PrimaryPart
+        if teleportToHRP(targetHRP) then
+            notify("Teleported to nearest: " .. nearest.DisplayName .. string.format(" (%.1f studs)", shortestDist), Color3.fromRGB(50, 195, 75))
+        end
+    else
+        notify("No other players found nearby", Color3.fromRGB(218, 38, 38))
+    end
+end)
+playersTab:AddButton("Teleport to Random Player", "RANDOM", function()
+    local list = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local root = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso") or p.Character.PrimaryPart
+            if root then
+                table.insert(list, p)
+            end
+        end
+    end
+    if #list > 0 then
+        local chosen = list[math.random(1, #list)]
+        local targetHRP = chosen.Character:FindFirstChild("HumanoidRootPart") or chosen.Character:FindFirstChild("Torso") or chosen.Character.PrimaryPart
+        if teleportToHRP(targetHRP) then
+            notify("Teleported to random: " .. chosen.DisplayName, Color3.fromRGB(50, 195, 75))
+        end
+    else
+        notify("No alternative player found to teleport to", Color3.fromRGB(218, 38, 38))
+    end
+end)
+
+playersTab:AddButton("Watch Player Camera", "SPECTATE", function()
+    if not tpSelectPlayer then
+        notify("Select target first!", Color3.fromRGB(218, 38, 38))
+        return
+    end
+    spectatePlayer(tpSelectPlayer)
+end)
+
+local followToggle = playersTab:AddToggle("Auto Follow Player", S.FollowActive, function(v)
+    S.FollowActive = v
+    S.FollowTarget = tpSelectPlayer
+    if v then notify("Following Target", Color3.fromRGB(218, 170, 42)) end
+    saveConfig()
+end)
 
 -- ──────────────────────────────────────────────────────────────
 --  TAB 6 ▸ WORLD
@@ -3035,6 +3103,125 @@ auditsTab:AddButton("Teleport to Myriad Test Game", "MYRIAD GAME", function()
 end)
 
 -- ──────────────────────────────────────────────────────────────
+--  TAB 8.5 ▸ CONSOLE
+-- ──────────────────────────────────────────────────────────────
+local consoleTab = Win:AddTab("Console")
+
+consoleTab:AddSection("CONSOLE FILTER & CONTROLS")
+local showInfo = true
+local showWarn = true
+local showError = true
+
+local consoleLogs = {}
+local consoleFeed = nil
+
+local function rebuildConsoleFeed()
+    if not consoleFeed then return end
+    consoleFeed:Clear()
+    for _, log in ipairs(consoleLogs) do
+        local message = log.message
+        local messageType = log.messageType
+        local color = Color3.fromRGB(220, 220, 220)
+        local prefix = ""
+        local shouldShow = false
+        
+        if messageType == Enum.MessageType.MessageOutput or messageType == Enum.MessageType.MessageInfo then
+            if messageType == Enum.MessageType.MessageInfo then
+                color = Color3.fromRGB(80, 180, 240)
+                prefix = "[INFO] "
+            else
+                color = Color3.fromRGB(220, 220, 220)
+            end
+            shouldShow = showInfo
+        elseif messageType == Enum.MessageType.MessageWarning then
+            color = Color3.fromRGB(240, 200, 50)
+            prefix = "[WARN] "
+            shouldShow = showWarn
+        elseif messageType == Enum.MessageType.MessageError then
+            color = Color3.fromRGB(240, 70, 70)
+            prefix = "[ERROR] "
+            shouldShow = showError
+        end
+        
+        if shouldShow then
+            consoleFeed:AddEntry(prefix .. message, color)
+        end
+    end
+end
+
+consoleTab:AddToggle("Show Prints & Info", true, function(v)
+    showInfo = v
+    rebuildConsoleFeed()
+end)
+consoleTab:AddToggle("Show Warnings", true, function(v)
+    showWarn = v
+    rebuildConsoleFeed()
+end)
+consoleTab:AddToggle("Show Errors", true, function(v)
+    showError = v
+    rebuildConsoleFeed()
+end)
+
+consoleTab:AddButton("Clear Console Log", "CLEAR", function()
+    consoleLogs = {}
+    if consoleFeed then
+        consoleFeed:Clear()
+    end
+end)
+
+consoleTab:AddSection("CONSOLE OUTPUT LOG")
+consoleFeed = consoleTab:AddScrollFeed(320)
+
+-- Populate initial history (limit to last 150 entries to avoid load lag)
+local LogService = game:GetService("LogService")
+pcall(function()
+    local history = LogService:GetLogHistory()
+    local startIdx = math.max(1, #history - 150)
+    for i = startIdx, #history do
+        local log = history[i]
+        table.insert(consoleLogs, { message = log.message, messageType = log.messageType })
+    end
+    rebuildConsoleFeed()
+end)
+
+-- Real-time log listener
+local logConnection = LogService.MessageOut:Connect(function(message, messageType)
+    table.insert(consoleLogs, { message = message, messageType = messageType })
+    if #consoleLogs > 500 then
+        table.remove(consoleLogs, 1)
+    end
+    
+    if not consoleFeed then return end
+    
+    local color = Color3.fromRGB(220, 220, 220)
+    local shouldShow = false
+    local prefix = ""
+    
+    if messageType == Enum.MessageType.MessageOutput or messageType == Enum.MessageType.MessageInfo then
+        if messageType == Enum.MessageType.MessageInfo then
+            color = Color3.fromRGB(80, 180, 240)
+            prefix = "[INFO] "
+        else
+            color = Color3.fromRGB(220, 220, 220)
+        end
+        shouldShow = showInfo
+    elseif messageType == Enum.MessageType.MessageWarning then
+        color = Color3.fromRGB(240, 200, 50)
+        prefix = "[WARN] "
+        shouldShow = showWarn
+    elseif messageType == Enum.MessageType.MessageError then
+        color = Color3.fromRGB(240, 70, 70)
+        prefix = "[ERROR] "
+        shouldShow = showError
+    end
+    
+    if shouldShow then
+        consoleFeed:AddEntry(prefix .. message, color)
+    end
+end)
+table.insert(S.Connections, logConnection)
+
+-- ──────────────────────────────────────────────────────────────
 --  TAB 9 ▸ SETTINGS
 -- ──────────────────────────────────────────────────────────────
 local settingsTab = Win:AddTab("Settings")
@@ -3070,7 +3257,7 @@ settingsTab:AddKeybind("Blink Teleport Key Bind", S.BlinkKey, function(k) S.Blin
 -- ──────────────────────────────────────────────────────────────
 function enableGhostMode()
     local myChar = LP.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local myHRP = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso") or myChar.PrimaryPart)
     if not myHRP then return end
     
     S.GhostCFrame = myHRP.CFrame
@@ -3106,7 +3293,7 @@ end
 
 function disableGhostMode()
     local myChar = LP.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local myHRP = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso") or myChar.PrimaryPart)
     
     if S.GhostDummy then
         pcall(function() S.GhostDummy:Destroy() end)
@@ -3206,6 +3393,7 @@ end
 -- ──────────────────────────────────────────────────────────────
 local function isPartVisible(part, char)
     if not part then return false end
+    local Camera = Workspace.CurrentCamera or Workspace:FindFirstChildOfClass("Camera") or Camera
     local origin = Camera.CFrame.Position
     local destination = part.Position
     local direction = destination - origin
@@ -3239,6 +3427,7 @@ local function getAimbotTargetPart(char)
 end
 
 local function getAimbotTarget()
+    local Camera = Workspace.CurrentCamera or Workspace:FindFirstChildOfClass("Camera") or Camera
     local bestTarget = nil
     local closestDist = S.AimbotFOV
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -3272,7 +3461,8 @@ end
 --  ESP SCREEN BOUNDING BOX CALCULATION
 -- ──────────────────────────────────────────────────────────────
 local function getBoundingBox(char)
-    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local Camera = Workspace.CurrentCamera or Workspace:FindFirstChildOfClass("Camera") or Camera
+    local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char.PrimaryPart
     if not hrp then return nil end
     
     local size = Vector3.new(4.2, 5.5, 2.5)
@@ -3291,18 +3481,20 @@ local function getBoundingBox(char)
     
     local minX, minY = math.huge, math.huge
     local maxX, maxY = -math.huge, -math.huge
-    local anyOnScreen = false
+    local anyVisible = false
     
     for _, corner in ipairs(corners) do
         local sp, onScreen = Camera:WorldToViewportPoint(corner)
-        if onScreen then anyOnScreen = true end
-        if sp.X < minX then minX = sp.X end
-        if sp.X > maxX then maxX = sp.X end
-        if sp.Y < minY then minY = sp.Y end
-        if sp.Y > maxY then maxY = sp.Y end
+        if sp.Z > 0 then
+            anyVisible = true
+            if sp.X < minX then minX = sp.X end
+            if sp.X > maxX then maxX = sp.X end
+            if sp.Y < minY then minY = sp.Y end
+            if sp.Y > maxY then maxY = sp.Y end
+        end
     end
     
-    if not anyOnScreen then return nil end
+    if not anyVisible then return nil end
     return { Vector2.new(minX, minY), Vector2.new(maxX, maxY) }
 end
 
@@ -3312,6 +3504,7 @@ end
 
 -- ── 1. RenderStepped Aimbot, FOV, and ESP Update ───────────────
 table.insert(S.Connections, RunService.RenderStepped:Connect(function()
+    Camera = Workspace.CurrentCamera or Workspace:FindFirstChildOfClass("Camera") or Camera
     -- fog clear safety
     if S.ClearVision then
         Lighting.FogEnd = 100000
@@ -3347,7 +3540,7 @@ table.insert(S.Connections, RunService.RenderStepped:Connect(function()
     for _, p in ipairs(Players:GetPlayers()) do
         if p == LP then continue end
         local char = p.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char.PrimaryPart)
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         
         local valid = char and hrp and hum and hum.Health > 0
@@ -3360,7 +3553,7 @@ table.insert(S.Connections, RunService.RenderStepped:Connect(function()
             local box = getBoundingBox(char)
             local sp, onScreen = Camera:WorldToViewportPoint(hrp.Position)
             
-            if box and onScreen then
+            if box and sp.Z > 0 then
                 local topLeft = box[1]
                 local bottomRight = box[2]
                 local width = bottomRight.X - topLeft.X
@@ -3639,7 +3832,7 @@ table.insert(S.Connections, RunService.Heartbeat:Connect(function(dt)
     -- 8. Auto Follow
     pcall(function()
         if S.FollowActive and S.FollowTarget then
-            local tgtHRP = S.FollowTarget.Character and S.FollowTarget.Character:FindFirstChild("HumanoidRootPart")
+            local tgtHRP = S.FollowTarget.Character and (S.FollowTarget.Character:FindFirstChild("HumanoidRootPart") or S.FollowTarget.Character:FindFirstChild("Torso") or S.FollowTarget.Character.PrimaryPart)
             if tgtHRP then teleportToHRP(tgtHRP) end
         end
     end)
@@ -3709,10 +3902,11 @@ end
             local tool = myChar:FindFirstChildOfClass("Tool")
             if tool and tool:FindFirstChild("Handle") then
                 for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= LP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-                        if (p.Character.HumanoidRootPart.Position - myHRP.Position).Magnitude <= S.KillAuraRange then
-                            firetouchinterest(tool.Handle, p.Character.HumanoidRootPart, 0)
-                            firetouchinterest(tool.Handle, p.Character.HumanoidRootPart, 1)
+                    local root = p.Character and (p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso") or p.Character.PrimaryPart)
+                    if p ~= LP and p.Character and root and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                        if (root.Position - myHRP.Position).Magnitude <= S.KillAuraRange then
+                            firetouchinterest(tool.Handle, root, 0)
+                            firetouchinterest(tool.Handle, root, 1)
                         end
                     end
                 end
