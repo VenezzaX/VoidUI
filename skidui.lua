@@ -577,7 +577,7 @@ local function setupAutoReinject()
             loadstring(readfile("Script.lua"))()
         else
             local ok, err = pcall(function()
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/VenezzaX/VoidUI/refs/heads/main/menu.lua", true))()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/VenezzaX/VoidUI/refs/heads/main/skidui.lua", true))()
             end)
             if not ok then
                 warn("Void Utility Hub auto-reinject failed: " .. tostring(err))
