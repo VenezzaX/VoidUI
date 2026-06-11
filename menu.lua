@@ -57,6 +57,8 @@ local freecamInputConn = nil
 local freecamInputBeganConn = nil
 local freecamInputEndedConn = nil
 local freecamBasePos = nil
+local currentSpectateTarget = nil
+local spectatePlayer = nil
 
 -- ──────────────────────────────────────────────────────────────
 --  STATE CONFIGURATION
@@ -1915,7 +1917,7 @@ playersTab:AddButton("Fling All Players", "FLING ALL", function()
 end)
 
 playerCards = {}
-local currentSpectateTarget = nil
+currentSpectateTarget = nil
 
 local function resetCameraToSelf()
     currentSpectateTarget = nil
@@ -1948,7 +1950,7 @@ local function resetCameraToSelf()
     end
 end
 
-local function spectatePlayer(targetPlayer)
+spectatePlayer = function(targetPlayer)
     if not targetPlayer then
         resetCameraToSelf()
         return
