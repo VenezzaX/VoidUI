@@ -15,12 +15,17 @@ local TweenService     = game:GetService("TweenService")
 
 local playerCards = {}
 local consoleLogs = {}
+local consoleLogsMap = {}
 local currentSpectateTarget = nil
 local spectateIndex = 1
 local LP     = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse  = LP:GetMouse()
 local uiVisible = true
+
+local visRaycastParams = RaycastParams.new()
+visRaycastParams.FilterType = Enum.RaycastFilterType.Exclude
+visRaycastParams.IgnoreWater = true
 local windowFrame = nil
 local notify = nil
 local autoReinjectToggle = nil
@@ -166,9 +171,12 @@ local S = {
     TallRunningConn = nil,
     GodModeConn = nil,
     OriginalPartTransparencies = {},
+    OriginalLightingEffects = {},
+    OriginalFogEnd = nil,
     
     -- Connection tracking
     Connections = {},
+    ChatConnections = {},
     ESPPool = {},      -- [Player] = { BoxOutline, BoxFill, TracerLine, NameTag, HealthBar }
     OverheadPool = {}, -- [Player] = BillboardGui
     HitboxStore = {},  -- [Player] = { OriginalSize, OriginalCanCollide }
@@ -283,6 +291,14 @@ local function cleanupAll()
         pcall(function() c:Disconnect() end)
     end
     S.Connections = {}
+    
+    if S.GodModeConn then pcall(function() S.GodModeConn:Disconnect() end) S.GodModeConn = nil end
+    if S.TallRunningConn then pcall(function() S.TallRunningConn:Disconnect() end) S.TallRunningConn = nil end
+    
+    for p, conn in pairs(S.ChatConnections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    S.ChatConnections = {}
     
     for p, _ in pairs(S.ESPPool) do
         destroyESP(p)
@@ -517,19 +533,31 @@ end
 local function toggleClearVision(v)
     S.ClearVision = v
     if v then
+        if S.OriginalFogEnd == nil then
+            S.OriginalFogEnd = Lighting.FogEnd
+        end
         Lighting.FogEnd = 100000
         for _, descendant in ipairs(Lighting:GetDescendants()) do
             if descendant:IsA("BlurEffect") or descendant:IsA("DepthOfFieldEffect") or descendant:IsA("Atmosphere") or descendant:IsA("ColorCorrectionEffect") then
+                if S.OriginalLightingEffects[descendant] == nil then
+                    S.OriginalLightingEffects[descendant] = descendant.Enabled
+                end
                 descendant.Enabled = false
             end
         end
     else
-        Lighting.FogEnd = 10000
-        for _, descendant in ipairs(Lighting:GetDescendants()) do
-            if descendant:IsA("BlurEffect") or descendant:IsA("DepthOfFieldEffect") or descendant:IsA("Atmosphere") or descendant:IsA("ColorCorrectionEffect") then
-                descendant.Enabled = true
-            end
+        if S.OriginalFogEnd ~= nil then
+            Lighting.FogEnd = S.OriginalFogEnd
+            S.OriginalFogEnd = nil
         end
+        for descendant, originalEnabled in pairs(S.OriginalLightingEffects) do
+            pcall(function()
+                if descendant and descendant.Parent then
+                    descendant.Enabled = originalEnabled
+                end
+            end)
+        end
+        S.OriginalLightingEffects = {}
     end
 end
 
@@ -565,7 +593,7 @@ local function setupAutoRejoin()
     if rejoinHooked then return end
     rejoinHooked = true
     pcall(function()
-        game:GetService("GuiService").ErrorMessageChanged:Connect(function()
+        local conn = game:GetService("GuiService").ErrorMessageChanged:Connect(function()
             if S.AutoRejoin then
                 if notify then
                     notify("Kicked from server! Rejoining in 5 seconds...", Color3.fromRGB(218, 38, 38))
@@ -576,6 +604,7 @@ local function setupAutoRejoin()
                 TeleportService:Teleport(game.PlaceId, LP)
             end
         end)
+        table.insert(S.Connections, conn)
     end)
 end
 
@@ -891,15 +920,37 @@ local function connectConsoleLogger()
                 rawTime = rawTime / 1000
             end
             local timestamp = os.date("%H:%M:%S", rawTime)
-            local logObj = {
-                message = msg,
-                messageType = msgType,
-                timestamp = timestamp
-            }
-            table.insert(consoleLogs, logObj)
-            if #consoleLogs > 500 then
-                table.remove(consoleLogs, 1)
+            
+            local key = msgType.Value .. "_" .. msg
+            local existingLog = consoleLogsMap[key]
+            if existingLog then
+                existingLog.count = (existingLog.count or 1) + 1
+                existingLog.timestamp = timestamp
+                for idx, item in ipairs(consoleLogs) do
+                    if item == existingLog then
+                        table.remove(consoleLogs, idx)
+                        break
+                    end
+                end
+                table.insert(consoleLogs, existingLog)
+            else
+                local logObj = {
+                    message = msg,
+                    messageType = msgType,
+                    timestamp = timestamp,
+                    count = 1
+                }
+                table.insert(consoleLogs, logObj)
+                consoleLogsMap[key] = logObj
+                if #consoleLogs > 500 then
+                    local removed = table.remove(consoleLogs, 1)
+                    if removed then
+                        local rKey = removed.messageType.Value .. "_" .. removed.message
+                        consoleLogsMap[rKey] = nil
+                    end
+                end
             end
+            
             if activeConsoleFeed then
                 local prefix = ""
                 local col = Color3.fromRGB(220, 220, 220)
@@ -913,20 +964,43 @@ local function connectConsoleLogger()
                     col = Color3.fromRGB(240, 70, 70)
                     prefix = "[ERROR] "
                 end
-                activeConsoleFeed:AddEntry(prefix .. msg, col)
+                
+                local currentLog = consoleLogsMap[key]
+                activeConsoleFeed:AddEntry(prefix .. msg, col, currentLog.count)
             end
         end
     end)
 
     local con = LogService.MessageOut:Connect(function(msg, msgType)
-        local logObj = {
-            message = msg,
-            messageType = msgType,
-            timestamp = os.date("%H:%M:%S")
-        }
-        table.insert(consoleLogs, logObj)
-        if #consoleLogs > 500 then
-            table.remove(consoleLogs, 1)
+        local timestamp = os.date("%H:%M:%S")
+        local key = msgType.Value .. "_" .. msg
+        local existingLog = consoleLogsMap[key]
+        if existingLog then
+            existingLog.count = (existingLog.count or 1) + 1
+            existingLog.timestamp = timestamp
+            for idx, item in ipairs(consoleLogs) do
+                if item == existingLog then
+                    table.remove(consoleLogs, idx)
+                    break
+                end
+            end
+            table.insert(consoleLogs, existingLog)
+        else
+            local logObj = {
+                message = msg,
+                messageType = msgType,
+                timestamp = timestamp,
+                count = 1
+            }
+            table.insert(consoleLogs, logObj)
+            consoleLogsMap[key] = logObj
+            if #consoleLogs > 500 then
+                local removed = table.remove(consoleLogs, 1)
+                if removed then
+                    local rKey = removed.messageType.Value .. "_" .. removed.message
+                    consoleLogsMap[rKey] = nil
+                end
+            end
         end
         if activeConsoleFeed then
             local prefix = ""
@@ -1023,7 +1097,7 @@ local function connectChatLogger()
     else
         pcall(function()
             for _, p in ipairs(Players:GetPlayers()) do
-                p.Chatted:Connect(function(msg)
+                S.ChatConnections[p] = p.Chatted:Connect(function(msg)
                     local speaker = p.DisplayName
                     if isDuplicateChat(speaker, msg) then return end
 
@@ -1047,7 +1121,7 @@ local function connectChatLogger()
             end
             
             local playerAddedCon = Players.PlayerAdded:Connect(function(p)
-                p.Chatted:Connect(function(msg)
+                S.ChatConnections[p] = p.Chatted:Connect(function(msg)
                     local speaker = p.DisplayName
                     if isDuplicateChat(speaker, msg) then return end
 
@@ -2305,13 +2379,29 @@ local function addScrollFeedOption(parent, height)
     layout.Padding = UDim.new(0, 1)
     layout.Parent = scroll
 
+    local entriesMap = {}
+    local entryCount = 0
+
     return {
         Clear = function()
             for _, c in ipairs(scroll:GetChildren()) do
                 if c:IsA("TextLabel") then c:Destroy() end
             end
+            entriesMap = {}
+            entryCount = 0
         end,
-        AddEntry = function(self, text, color)
+        AddEntry = function(self, text, color, count)
+            local initialCount = count or 1
+            local existing = entriesMap[text]
+            if existing then
+                existing.count = existing.count + initialCount
+                existing.label.Text = string.format("%s (x%d)", text, existing.count)
+                return
+            end
+
+            entryCount = entryCount + 1
+            local currentOrder = entryCount
+
             local scale = 1.0
             local winFrame = findWindowFrame(row)
             if winFrame then
@@ -2331,9 +2421,17 @@ local function addScrollFeedOption(parent, height)
             label.TextSize = math.clamp(math.round(7 * scale), 7, 24)
             label.TextColor3 = color or Color3.fromRGB(200, 200, 200)
             label.TextXAlignment = Enum.TextXAlignment.Left
-            label.Text = text
+            label.LayoutOrder = currentOrder
+            
+            local displayText = text
+            if initialCount > 1 then
+                displayText = string.format("%s (x%d)", text, initialCount)
+            end
+            label.Text = displayText
             label.TextWrapped = true
             label.Parent = scroll
+
+            entriesMap[text] = { label = label, count = initialCount }
 
             task.defer(function()
                 scroll.CanvasPosition = Vector2.new(0, scroll.AbsoluteCanvasSize.Y)
@@ -4530,6 +4628,10 @@ registerModule("Misc", "External Scripts Hub", 720, 50, false, false, nil, funct
         pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/SimpleSpyV3/main.lua"))() end)
         notify("SimpleSpy V3 loaded successfully!", Color3.fromRGB(50, 195, 75))
     end)
+    addButtonOption(drawer, "Load Hydroxide Remote Spy", function()
+        pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/PolyphonyDev/Hydroxide/main/init.lua"))() end)
+        notify("Hydroxide Spy loaded successfully!", Color3.fromRGB(50, 195, 75))
+    end)
 end, true, 200, 220)
 
 registerModule("Misc", "UNC compliance & Audits", 720, 50, false, false, nil, function(drawer)
@@ -4589,7 +4691,7 @@ registerModule("Misc", "Console Log Viewer", 720, 50, false, false, nil, functio
             end
             
             if show then
-                conFeed:AddEntry(prefix .. msg, col)
+                conFeed:AddEntry(prefix .. msg, col, log.count)
             end
         end
     end
@@ -4608,6 +4710,7 @@ registerModule("Misc", "Console Log Viewer", 720, 50, false, false, nil, functio
     end)
     addButtonOption(drawer, "Clear Console Log", function()
         consoleLogs = {}
+        consoleLogsMap = {}
         conFeed:Clear()
     end)
 
@@ -4775,12 +4878,9 @@ local function isPartVisible(part, char)
     local direction = destination - origin
     if direction.Magnitude == 0 then return true end
     
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = {LP.Character, char}
-    params.IgnoreWater = true
+    visRaycastParams.FilterDescendantsInstances = {LP.Character, char}
     
-    local result = Workspace:Raycast(origin, direction, params)
+    local result = Workspace:Raycast(origin, direction, visRaycastParams)
     return result == nil
 end
 
@@ -4838,40 +4938,21 @@ end
 -- ──────────────────────────────────────────────────────────────
 local function getBoundingBox(char)
     local Camera = Workspace.CurrentCamera or Workspace:FindFirstChildOfClass("Camera") or Camera
-    local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char.PrimaryPart
+    local hrp = char.PrimaryPart or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
     if not hrp then return nil end
     
-    local size = Vector3.new(4.2, 5.5, 2.5)
-    local cf = hrp.CFrame
+    local hrPos = hrp.Position
+    local topSp, topOnScreen = Camera:WorldToViewportPoint(hrPos + Vector3.new(0, 3, 0))
+    if topSp.Z <= 0 then return nil end
     
-    local corners = {
-        cf * Vector3.new(-size.X/2,  size.Y/2,  size.Z/2),
-        cf * Vector3.new( size.X/2,  size.Y/2,  size.Z/2),
-        cf * Vector3.new(-size.X/2, -size.Y/2,  size.Z/2),
-        cf * Vector3.new( size.X/2, -size.Y/2,  size.Z/2),
-        cf * Vector3.new(-size.X/2,  size.Y/2, -size.Z/2),
-        cf * Vector3.new( size.X/2,  size.Y/2, -size.Z/2),
-        cf * Vector3.new(-size.X/2, -size.Y/2, -size.Z/2),
-        cf * Vector3.new( size.X/2, -size.Y/2, -size.Z/2)
+    local botSp = Camera:WorldToViewportPoint(hrPos - Vector3.new(0, 3.5, 0))
+    local height = math.abs(topSp.Y - botSp.Y)
+    local width = height * 0.6
+    
+    return {
+        Vector2.new(topSp.X - width/2, topSp.Y),
+        Vector2.new(topSp.X + width/2, botSp.Y)
     }
-    
-    local minX, minY = math.huge, math.huge
-    local maxX, maxY = -math.huge, -math.huge
-    local anyVisible = false
-    
-    for _, corner in ipairs(corners) do
-        local sp, onScreen = Camera:WorldToViewportPoint(corner)
-        if sp.Z > 0 then
-            anyVisible = true
-            if sp.X < minX then minX = sp.X end
-            if sp.X > maxX then maxX = sp.X end
-            if sp.Y < minY then minY = sp.Y end
-            if sp.Y > maxY then maxY = sp.Y end
-        end
-    end
-    
-    if not anyVisible then return nil end
-    return { Vector2.new(minX, minY), Vector2.new(maxX, maxY) }
 end
 
 -- ──────────────────────────────────────────────────────────────
@@ -4918,136 +4999,142 @@ table.insert(S.Connections, RunService.RenderStepped:Connect(function()
     }
     -- Clean up disconnected players
     for p, _ in pairs(S.ESPPool) do
-        local ok, exists = pcall(function() return p and p.Parent == Players end)
-        if not ok or not exists then
+        if not p or p.Parent ~= Players then
             destroyESP(p)
         end
     end
     for p, _ in pairs(S.HitboxStore) do
-        local ok, exists = pcall(function() return p and p.Parent == Players end)
-        if not ok or not exists then
+        if not p or p.Parent ~= Players then
             restoreHitbox(p)
         end
     end
     for p, bill in pairs(S.OverheadPool) do
-        local ok, exists = pcall(function() return p and p.Parent == Players end)
-        if not ok or not exists then
+        if not p or p.Parent ~= Players then
             pcall(function() bill:Destroy() end)
             S.OverheadPool[p] = nil
         end
     end
 
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p == LP then continue end
-        local char = p.Character
-        local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char.PrimaryPart)
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        
-        local valid = char and hrp and hum and hum.Health > 0
-        if valid and (S.ESPBoxes or S.ESPTracers or S.ESPNames or S.ESPHealth or S.ESPDistances) then
-            if S.ESPTeamCheck and p.Team == LP.Team then
-                destroyESP(p)
-                continue
-            end
+    local espEnabled = (S.ESPBoxes or S.ESPTracers or S.ESPNames or S.ESPHealth or S.ESPDistances)
+    if espEnabled then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p == LP then continue end
+            local char = p.Character
+            local hrp = char and (char.PrimaryPart or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
             
-            local box = getBoundingBox(char)
-            local sp, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-            
-            if box and sp.Z > 0 then
-                local topLeft = box[1]
-                local bottomRight = box[2]
-                local width = bottomRight.X - topLeft.X
-                local height = bottomRight.Y - topLeft.Y
-                
-                local teamCol = p.Team and p.Team.TeamColor.Color or Color3.fromRGB(218, 38, 38)
-                local espDrawCol = espColorMapping[S.ESPColor] or teamCol
-                
-                if not S.ESPPool[p] then
-                    S.ESPPool[p] = {
-                        boxOutline = Drawing.new("Square"),
-                        boxFill = Drawing.new("Square"),
-                        tracer = Drawing.new("Line"),
-                        nameTag = Drawing.new("Text"),
-                        healthText = Drawing.new("Text"),
-                        distText = Drawing.new("Text")
-                    }
+            local valid = char and hrp and hum and hum.Health > 0
+            if valid then
+                if S.ESPTeamCheck and p.Team == LP.Team then
+                    destroyESP(p)
+                    continue
                 end
-                local pool = S.ESPPool[p]
                 
-                local outline = pool.boxOutline
-                outline.Visible = S.ESPBoxes
-                outline.Position = topLeft
-                outline.Size = Vector2.new(width, height)
-                outline.Color = espDrawCol
-                outline.Thickness = 1.5
-                outline.Transparency = 1
-                outline.Filled = false
+                local box = getBoundingBox(char)
+                local sp, onScreen = Camera:WorldToViewportPoint(hrp.Position)
                 
-                local fill = pool.boxFill
-                fill.Visible = S.ESPBoxes
-                fill.Position = topLeft
-                fill.Size = Vector2.new(width, height)
-                fill.Color = espDrawCol
-                fill.Transparency = 1 - S.ESPTransparency
-                fill.Filled = true
-                
-                local tracer = pool.tracer
-                tracer.Visible = S.ESPTracers
-                local vp = Camera.ViewportSize
-                local originY = vp.Y
-                if S.TracerOrigin == "Center" then
-                    originY = vp.Y / 2
-                elseif S.TracerOrigin == "Top" then
-                    originY = 0
+                if box and sp.Z > 0 then
+                    local topLeft = box[1]
+                    local bottomRight = box[2]
+                    local width = bottomRight.X - topLeft.X
+                    local height = bottomRight.Y - topLeft.Y
+                    
+                    local teamCol = p.Team and p.Team.TeamColor.Color or Color3.fromRGB(218, 38, 38)
+                    local espDrawCol = espColorMapping[S.ESPColor] or teamCol
+                    
+                    if not S.ESPPool[p] then
+                        S.ESPPool[p] = {
+                            boxOutline = Drawing.new("Square"),
+                            boxFill = Drawing.new("Square"),
+                            tracer = Drawing.new("Line"),
+                            nameTag = Drawing.new("Text"),
+                            healthText = Drawing.new("Text"),
+                            distText = Drawing.new("Text")
+                        }
+                    end
+                    local pool = S.ESPPool[p]
+                    
+                    local outline = pool.boxOutline
+                    outline.Visible = S.ESPBoxes
+                    outline.Position = topLeft
+                    outline.Size = Vector2.new(width, height)
+                    outline.Color = espDrawCol
+                    outline.Thickness = 1.5
+                    outline.Transparency = 1
+                    outline.Filled = false
+                    
+                    local fill = pool.boxFill
+                    fill.Visible = S.ESPBoxes
+                    fill.Position = topLeft
+                    fill.Size = Vector2.new(width, height)
+                    fill.Color = espDrawCol
+                    fill.Transparency = 1 - S.ESPTransparency
+                    fill.Filled = true
+                    
+                    local tracer = pool.tracer
+                    tracer.Visible = S.ESPTracers
+                    local vp = Camera.ViewportSize
+                    local originY = vp.Y
+                    if S.TracerOrigin == "Center" then
+                        originY = vp.Y / 2
+                    elseif S.TracerOrigin == "Top" then
+                        originY = 0
+                    end
+                    tracer.From = Vector2.new(vp.X / 2, originY)
+                    tracer.To = Vector2.new(sp.X, sp.Y)
+                    tracer.Color = espDrawCol
+                    tracer.Thickness = 1.5
+                    tracer.Transparency = 0.8
+                    
+                    local dist = math.round((hrp.Position - Camera.CFrame.Position).Magnitude)
+                    
+                    local nameTag = pool.nameTag
+                    nameTag.Visible = S.ESPNames
+                    nameTag.Text = p.DisplayName
+                    nameTag.Size = 13
+                    nameTag.Center = true
+                    nameTag.Outline = true
+                    nameTag.Color = Color3.new(1, 1, 1)
+                    nameTag.Position = Vector2.new(topLeft.X + width / 2, topLeft.Y - 15)
+                    
+                    local healthText = pool.healthText
+                    healthText.Visible = S.ESPHealth
+                    healthText.Text = string.format("%d HP", math.floor(hum.Health))
+                    healthText.Size = 11
+                    healthText.Center = true
+                    healthText.Outline = true
+                    local hpPct = hum.Health / math.max(hum.MaxHealth, 1)
+                    healthText.Color = Color3.fromRGB(255 * (1 - hpPct), 255 * hpPct, 0)
+                    healthText.Position = Vector2.new(topLeft.X + width / 2, bottomRight.Y + 2)
+                    
+                    local distText = pool.distText
+                    distText.Visible = S.ESPDistances
+                    distText.Text = string.format("[%d studs]", dist)
+                    distText.Size = 10
+                    distText.Center = true
+                    distText.Outline = true
+                    distText.Color = Color3.fromRGB(200, 200, 200)
+                    distText.Position = Vector2.new(topLeft.X + width / 2, bottomRight.Y + (S.ESPHealth and 15 or 2))
+                else
+                    local pool = S.ESPPool[p]
+                    if pool then
+                        pool.boxOutline.Visible = false
+                        pool.boxFill.Visible = false
+                        pool.tracer.Visible = false
+                        pool.nameTag.Visible = false
+                        pool.healthText.Visible = false
+                        pool.distText.Visible = false
+                    end
                 end
-                tracer.From = Vector2.new(vp.X / 2, originY)
-                tracer.To = Vector2.new(sp.X, sp.Y)
-                tracer.Color = espDrawCol
-                tracer.Thickness = 1.5
-                tracer.Transparency = 0.8
-                
-                local dist = math.round((hrp.Position - Camera.CFrame.Position).Magnitude)
-                
-                local nameTag = pool.nameTag
-                nameTag.Visible = S.ESPNames
-                nameTag.Text = p.DisplayName
-                nameTag.Size = 13
-                nameTag.Center = true
-                nameTag.Outline = true
-                nameTag.Color = Color3.new(1, 1, 1)
-                nameTag.Position = Vector2.new(topLeft.X + width / 2, topLeft.Y - 15)
-                
-                local healthText = pool.healthText
-                healthText.Visible = S.ESPHealth
-                healthText.Text = string.format("%d HP", math.floor(hum.Health))
-                healthText.Size = 11
-                healthText.Center = true
-                healthText.Outline = true
-                local hpPct = hum.Health / math.max(hum.MaxHealth, 1)
-                healthText.Color = Color3.fromRGB(255 * (1 - hpPct), 255 * hpPct, 0)
-                healthText.Position = Vector2.new(topLeft.X + width / 2, bottomRight.Y + 2)
-                
-                local distText = pool.distText
-                distText.Visible = S.ESPDistances
-                distText.Text = string.format("[%d studs]", dist)
-                distText.Size = 10
-                distText.Center = true
-                distText.Outline = true
-                distText.Color = Color3.fromRGB(200, 200, 200)
-                distText.Position = Vector2.new(topLeft.X + width / 2, bottomRight.Y + (S.ESPHealth and 15 or 2))
             else
-                local pool = S.ESPPool[p]
-                if pool then
-                    pool.boxOutline.Visible = false
-                    pool.boxFill.Visible = false
-                    pool.tracer.Visible = false
-                    pool.nameTag.Visible = false
-                    pool.healthText.Visible = false
-                    pool.distText.Visible = false
-                end
+                destroyESP(p)
             end
-        else
-            destroyESP(p)
+        end
+    else
+        if next(S.ESPPool) ~= nil then
+            for p, _ in pairs(S.ESPPool) do
+                destroyESP(p)
+            end
         end
     end
 end))
@@ -5659,6 +5746,10 @@ table.insert(S.Connections, Players.PlayerRemoving:Connect(function(p)
         if S.OverheadPool[p] then
             pcall(function() S.OverheadPool[p]:Destroy() end)
             S.OverheadPool[p] = nil
+        end
+        if S.ChatConnections[p] then
+            pcall(function() S.ChatConnections[p]:Disconnect() end)
+            S.ChatConnections[p] = nil
         end
         if currentSpectateTarget == p then
             spectatePlayer(nil)
