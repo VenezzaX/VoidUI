@@ -79,6 +79,7 @@ local S = {
     
     FlingTarget = nil,
     FlingActive = false,
+    FlingAllActive = false,
     
     FollowTarget = nil,
     FollowActive = false,
@@ -227,12 +228,12 @@ local consoleFeed = rowConsoleFeed
 local function destroyESP(p)
     local pool = S.ESPPool[p]
     if pool then
-        pcall(function() pool.boxOutline:Remove() end)
-        pcall(function() pool.boxFill:Remove() end)
-        pcall(function() pool.tracer:Remove() end)
-        pcall(function() pool.nameTag:Remove() end)
-        pcall(function() pool.healthText:Remove() end)
-        pcall(function() pool.distText:Remove() end)
+        pcall(function() pool.boxOutline.Visible = false; pool.boxOutline:Remove() end)
+        pcall(function() pool.boxFill.Visible = false; pool.boxFill:Remove() end)
+        pcall(function() pool.tracer.Visible = false; pool.tracer:Remove() end)
+        pcall(function() pool.nameTag.Visible = false; pool.nameTag:Remove() end)
+        pcall(function() pool.healthText.Visible = false; pool.healthText:Remove() end)
+        pcall(function() pool.distText.Visible = false; pool.distText:Remove() end)
         S.ESPPool[p] = nil
     end
 end
@@ -1240,6 +1241,7 @@ local function loadConfig()
     S.KillAura = false
     S.AutoClicker = false
     S.FlingActive = false
+    S.FlingAllActive = false
     S.FollowActive = false
     S.AntiAnchor = false
     S.No3DRender = false
@@ -3355,12 +3357,27 @@ end, false)
 
 registerModule("Combat", "Fling Player", 20, 50, true, S.FlingActive, function(v)
     S.FlingActive = v
-    if not v then
-        local hrp = getHRP()
-        if hrp then
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            hrp.AssemblyAngularVelocity = Vector3.zero
-        end
+    if v then
+        S.FlingAllActive = false
+        local mod = moduleButtons["Fling All"]
+        if mod then mod.SetActive(false) end
+    else
+        S.FlingTarget = nil
+        task.spawn(function()
+            local hrp = getHRP()
+            if hrp then
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                if S.LastSafePosition then
+                    hrp.CFrame = S.LastSafePosition
+                end
+                task.wait(0.05)
+                if hrp:IsDescendantOf(game) then
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.AssemblyAngularVelocity = Vector3.zero
+                end
+            end
+        end)
     end
     saveConfig()
 end, function(drawer)
@@ -3386,6 +3403,33 @@ end, function(drawer)
         end
     end)
 end, false)
+
+registerModule("Combat", "Fling All", 20, 50, true, S.FlingAllActive, function(v)
+    S.FlingAllActive = v
+    if v then
+        S.FlingActive = false
+        local mod = moduleButtons["Fling Player"]
+        if mod then mod.SetActive(false) end
+    else
+        flingAllTarget = nil
+        task.spawn(function()
+            local hrp = getHRP()
+            if hrp then
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                if S.LastSafePosition then
+                    hrp.CFrame = S.LastSafePosition
+                end
+                task.wait(0.05)
+                if hrp:IsDescendantOf(game) then
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.AssemblyAngularVelocity = Vector3.zero
+                end
+            end
+        end)
+    end
+    saveConfig()
+end, nil, false)
 
 
 -- ──────────────────────────────────────────────────────────────
@@ -3632,6 +3676,15 @@ end, function(drawer)
     end
 
     box:GetPropertyChangedSignal("Text"):Connect(renderPlayers)
+    local addedConn = Players.PlayerAdded:Connect(renderPlayers)
+    local removedConn = Players.PlayerRemoving:Connect(function(p)
+        if currentSpectateTarget == p then
+            spectatePlayer(nil)
+        end
+        renderPlayers()
+    end)
+    table.insert(S.Connections, addedConn)
+    table.insert(S.Connections, removedConn)
     renderPlayers()
 end, true, 200, 280)
 
@@ -4649,8 +4702,7 @@ local function updateFlyVelocity()
     
     local dir = Vector3.zero
     local cf = Camera.CFrame
-    local fwd = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
-    if fwd.Magnitude > 0 then fwd = fwd.Unit end
+    local fwd = cf.LookVector
     
     if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + fwd end
     if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - fwd end
@@ -4678,13 +4730,13 @@ function flyOn()
     
     local bv = Instance.new("BodyVelocity")
     bv.Name = "VoidFlyBV"
-    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
     bv.Velocity = Vector3.zero
     bv.Parent = hrp
     
     local bg = Instance.new("BodyGyro")
     bg.Name = "VoidFlyBG"
-    bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
     bg.D = 100
     bg.Parent = hrp
 end
@@ -4854,6 +4906,27 @@ table.insert(S.Connections, RunService.RenderStepped:Connect(function()
         ["Cyan"] = Color3.fromRGB(45, 200, 220),
         ["White"] = Color3.fromRGB(255, 255, 255)
     }
+    -- Clean up disconnected players
+    for p, _ in pairs(S.ESPPool) do
+        local ok, exists = pcall(function() return p and p.Parent == Players end)
+        if not ok or not exists then
+            destroyESP(p)
+        end
+    end
+    for p, _ in pairs(S.HitboxStore) do
+        local ok, exists = pcall(function() return p and p.Parent == Players end)
+        if not ok or not exists then
+            restoreHitbox(p)
+        end
+    end
+    for p, bill in pairs(S.OverheadPool) do
+        local ok, exists = pcall(function() return p and p.Parent == Players end)
+        if not ok or not exists then
+            pcall(function() bill:Destroy() end)
+            S.OverheadPool[p] = nil
+        end
+    end
+
     for _, p in ipairs(Players:GetPlayers()) do
         if p == LP then continue end
         local char = p.Character
@@ -4953,7 +5026,15 @@ table.insert(S.Connections, RunService.RenderStepped:Connect(function()
                 distText.Color = Color3.fromRGB(200, 200, 200)
                 distText.Position = Vector2.new(topLeft.X + width / 2, bottomRight.Y + (S.ESPHealth and 15 or 2))
             else
-                destroyESP(p)
+                local pool = S.ESPPool[p]
+                if pool then
+                    pool.boxOutline.Visible = false
+                    pool.boxFill.Visible = false
+                    pool.tracer.Visible = false
+                    pool.nameTag.Visible = false
+                    pool.healthText.Visible = false
+                    pool.distText.Visible = false
+                end
             end
         else
             destroyESP(p)
@@ -4966,6 +5047,37 @@ local fpsCount = 0
 local lastFpsTick = tick()
 local lastPingTick = tick()
 local pingVal = 0
+
+local flingAllTarget = nil
+local flingAllTime = 0
+
+local function getNextFlingAllTarget(currentTarget)
+    local candidates = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso") or p.Character.PrimaryPart
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                table.insert(candidates, p)
+            end
+        end
+    end
+    if #candidates == 0 then return nil end
+    local currentIndex = 0
+    if currentTarget then
+        for idx, p in ipairs(candidates) do
+            if p == currentTarget then
+                currentIndex = idx
+                break
+            end
+        end
+    end
+    local nextIndex = currentIndex + 1
+    if nextIndex > #candidates then
+        nextIndex = 1
+    end
+    return candidates[nextIndex]
+end
 
 table.insert(S.Connections, RunService.Heartbeat:Connect(function(dt)
     pcall(function()
@@ -5250,7 +5362,7 @@ table.insert(S.Connections, RunService.Heartbeat:Connect(function(dt)
     
     pcall(function()
         if S.AntiFling then
-            if myHRP then
+            if myHRP and not S.FlingActive and not S.FlingAllActive then
                 if myHRP.AssemblyLinearVelocity.Magnitude > 150 then
                     myHRP.AssemblyLinearVelocity = Vector3.zero
                 end
@@ -5261,8 +5373,12 @@ table.insert(S.Connections, RunService.Heartbeat:Connect(function(dt)
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP and p.Character then
                     for _, part in ipairs(p.Character:GetDescendants()) do
-                        if part:IsA("BasePart") and part.CanCollide then
-                            part.CanCollide = false
+                        if part:IsA("BasePart") then
+                            pcall(function()
+                                part.CanCollide = false
+                                part.AssemblyLinearVelocity = Vector3.zero
+                                part.AssemblyAngularVelocity = Vector3.zero
+                            end)
                         end
                     end
                 end
@@ -5289,6 +5405,33 @@ table.insert(S.Connections, RunService.Heartbeat:Connect(function(dt)
                 local mod = moduleButtons["Fling Player"]
                 if mod then mod.SetActive(false) end
                 notify("Fling target lost or dead!", Color3.fromRGB(218, 38, 38))
+            end
+        elseif S.FlingAllActive and myHRP then
+            local now = tick()
+            local targetChar = flingAllTarget and flingAllTarget.Character
+            local targetHRP = targetChar and (targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso") or targetChar.PrimaryPart)
+            local targetHum = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
+            
+            if not targetHRP or not targetHum or targetHum.Health <= 0 or (now - flingAllTime) >= 0.5 then
+                flingAllTarget = getNextFlingAllTarget(flingAllTarget)
+                flingAllTime = now
+                if flingAllTarget then
+                    targetChar = flingAllTarget.Character
+                    targetHRP = targetChar and (targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso") or targetChar.PrimaryPart)
+                else
+                    targetHRP = nil
+                end
+            end
+            
+            if targetHRP then
+                for _, part in ipairs(myChar:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+                myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 1)
+                myHRP.AssemblyLinearVelocity = Vector3.new(0, 1000, 0)
+                myHRP.AssemblyAngularVelocity = Vector3.new(0, 50000, 0)
             end
         end
     end)
@@ -5452,9 +5595,9 @@ local function onCharSpawn(char)
     task.wait(0.5)
     local hum = char:WaitForChild("Humanoid", 5)
     if hum then
-        hum.UseJumpPower = true
-        hum.WalkSpeed = S.WalkSpeed
-        hum.JumpPower = S.JumpPower
+        hum.UseJumpPower = S.ForceJumpPower
+        hum.WalkSpeed = (S.ForceWalkSpeed and S.WalkSpeed) or 16
+        hum.JumpPower = (S.ForceJumpPower and S.JumpPower) or 50
     end
     
     if S.Fly then
@@ -5489,6 +5632,20 @@ end
 
 if LP.Character then onCharSpawn(LP.Character) end
 table.insert(S.Connections, LP.CharacterAdded:Connect(onCharSpawn))
+
+table.insert(S.Connections, Players.PlayerRemoving:Connect(function(p)
+    pcall(function()
+        destroyESP(p)
+        restoreHitbox(p)
+        if S.OverheadPool[p] then
+            pcall(function() S.OverheadPool[p]:Destroy() end)
+            S.OverheadPool[p] = nil
+        end
+        if currentSpectateTarget == p then
+            spectatePlayer(nil)
+        end
+    end)
+end))
 
 table.insert(S.Connections, LP.Idled:Connect(function()
     if S.AntiAFK then
