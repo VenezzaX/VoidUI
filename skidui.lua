@@ -33,6 +33,20 @@ local freecamBasePos = nil
 local originalAmbient = Lighting.Ambient
 local originalOutdoor = Lighting.OutdoorAmbient
 
+local gameDefaultSpeed = 16
+local gameDefaultJumpPower = 50
+local gameDefaultUseJumpPower = true
+
+pcall(function()
+    local char = LP.Character
+    local hum = char and (char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 2))
+    if hum then
+        gameDefaultSpeed = hum.WalkSpeed
+        gameDefaultJumpPower = hum.JumpPower
+        gameDefaultUseJumpPower = hum.UseJumpPower
+    end
+end)
+
 -- ──────────────────────────────────────────────────────────────
 --  STATE CONFIGURATION
 -- ──────────────────────────────────────────────────────────────
@@ -3695,7 +3709,7 @@ end, true, 200, 280)
 registerModule("Movement", "Speed Modification", 300, 50, true, S.ForceWalkSpeed, function(v)
     S.ForceWalkSpeed = v
     local hum = getHum()
-    if hum then hum.WalkSpeed = v and S.WalkSpeed or 16 end
+    if hum then hum.WalkSpeed = v and S.WalkSpeed or gameDefaultSpeed end
     saveConfig()
 end, function(drawer)
     addSliderOption(drawer, "WalkSpeed Speed", 16, 250, S.WalkSpeed, function(v)
@@ -3714,7 +3728,7 @@ registerModule("Movement", "Sprint Speed Boost", 300, 50, true, S.SprintEnabled,
     S.SprintEnabled = v
     if not v then
         local hum = getHum()
-        if hum then hum.WalkSpeed = S.WalkSpeed end
+        if hum then hum.WalkSpeed = (S.ForceWalkSpeed and S.WalkSpeed) or gameDefaultSpeed end
     end
     saveConfig()
 end, function(drawer)
@@ -4488,7 +4502,7 @@ registerModule("Misc", "Chat Logger", 720, 50, false, false, nil, function(drawe
 end, true, 240, 220)
 
 registerModule("Misc", "External Scripts Hub", 720, 50, false, false, nil, function(drawer)
-    addButtonOption(drawer, "Load Rotector", function()
+    addButtonOption(drawer, "Load Rotector Anti-Cheat", function()
         runExternalScript("Rotector", "https://raw.githubusercontent.com/VenezzaX/RobloxRotector/refs/heads/main/Rotector.lua")
     end)
     addButtonOption(drawer, "Load FE Emotes Script", function()
@@ -5567,9 +5581,11 @@ end))
 table.insert(S.Connections, UserInputService.InputEnded:Connect(function(inp, gpe)
     if gpe then return end
     if inp.KeyCode == Enum.KeyCode.LeftShift then
-        local hum = getHum()
-        if hum then
-            hum.WalkSpeed = S.WalkSpeed
+        if S.SprintEnabled then
+            local hum = getHum()
+            if hum then
+                hum.WalkSpeed = (S.ForceWalkSpeed and S.WalkSpeed) or gameDefaultSpeed
+            end
         end
     end
 end))
@@ -5591,9 +5607,16 @@ local function onCharSpawn(char)
     task.wait(0.5)
     local hum = char:WaitForChild("Humanoid", 5)
     if hum then
-        hum.UseJumpPower = S.ForceJumpPower
-        hum.WalkSpeed = (S.ForceWalkSpeed and S.WalkSpeed) or 16
-        hum.JumpPower = (S.ForceJumpPower and S.JumpPower) or 50
+        if not S.ForceWalkSpeed then
+            gameDefaultSpeed = hum.WalkSpeed
+        end
+        if not S.ForceJumpPower then
+            gameDefaultJumpPower = hum.JumpPower
+            gameDefaultUseJumpPower = hum.UseJumpPower
+        end
+        hum.UseJumpPower = S.ForceJumpPower and true or gameDefaultUseJumpPower
+        hum.WalkSpeed = (S.ForceWalkSpeed and S.WalkSpeed) or gameDefaultSpeed
+        hum.JumpPower = (S.ForceJumpPower and S.JumpPower) or gameDefaultJumpPower
     end
     
     if S.Fly then
