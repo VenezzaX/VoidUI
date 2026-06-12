@@ -4488,7 +4488,7 @@ registerModule("Misc", "Chat Logger", 720, 50, false, false, nil, function(drawe
 end, true, 240, 220)
 
 registerModule("Misc", "External Scripts Hub", 720, 50, false, false, nil, function(drawer)
-    addButtonOption(drawer, "Load Rotector Anti-Cheat", function()
+    addButtonOption(drawer, "Load Rotector", function()
         runExternalScript("Rotector", "https://raw.githubusercontent.com/VenezzaX/RobloxRotector/refs/heads/main/Rotector.lua")
     end)
     addButtonOption(drawer, "Load FE Emotes Script", function()
@@ -4515,10 +4515,6 @@ registerModule("Misc", "External Scripts Hub", 720, 50, false, false, nil, funct
     addButtonOption(drawer, "Load SimpleSpy V3 (Remote)", function()
         pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/SimpleSpyV3/main.lua"))() end)
         notify("SimpleSpy V3 loaded successfully!", Color3.fromRGB(50, 195, 75))
-    end)
-    addButtonOption(drawer, "Load Hydroxide Remote Spy", function()
-        pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/PolyphonyDev/Hydroxide/main/init.lua"))() end)
-        notify("Hydroxide Spy loaded successfully!", Color3.fromRGB(50, 195, 75))
     end)
 end, true, 200, 220)
 
