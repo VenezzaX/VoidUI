@@ -5776,4 +5776,4 @@ local toggleKeyName = S.UIToggleKey and S.UIToggleKey.Name or "RCtrl"
 logMessage("System", "WeAreSkidding loaded successfully. Keybind: [" .. toggleKeyName .. "] to toggle UI", Color3.fromRGB(50, 195, 75))
 notify("WeAreSkidding loaded! [" .. toggleKeyName .. "] to toggle UI", Color3.fromRGB(50, 195, 75))
 
-print("[WeAreSkidding] Custom GUI loaded successfully!")
+print("[WeAreSkidding] Injected mf!")
