@@ -287,31 +287,6 @@ local function cleanupAll()
             if oldPg then oldPg:Destroy() end
         end
     end)
-    
-    S.NoClip = false
-    pcall(function()
-        local char = getChar()
-        if char then
-            for _, p in ipairs(char:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    p.CanCollide = true
-                end
-            end
-        end
-    end)
-    
-    S.Fly = false
-    pcall(flyOff)
-    
-    S.GhostMode = false
-    pcall(disableGhostMode)
-    
-    S.Float = false
-    pcall(function() toggleFloat(false) end)
-    
-    S.WaterWalk = false
-    pcall(function() toggleWaterWalk(false) end)
-
     for _, c in ipairs(S.Connections) do
         pcall(function() c:Disconnect() end)
     end
@@ -5485,24 +5460,11 @@ table.insert(S.Connections, RunService.Heartbeat:Connect(function(dt)
     pcall(function()
         if S.AntiFling then
             if myHRP and not S.FlingActive and not S.FlingAllActive then
-                if myHRP.AssemblyLinearVelocity.Magnitude > 150 then
+                if myHRP.AssemblyLinearVelocity.Magnitude > 1000 then
                     myHRP.AssemblyLinearVelocity = Vector3.zero
                 end
-                if myHRP.AssemblyAngularVelocity.Magnitude > 100 then
+                if myHRP.AssemblyAngularVelocity.Magnitude > 300 then
                     myHRP.AssemblyAngularVelocity = Vector3.zero
-                end
-            end
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LP and p.Character then
-                    for _, part in ipairs(p.Character:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            pcall(function()
-                                part.CanCollide = false
-                                part.AssemblyLinearVelocity = Vector3.zero
-                                part.AssemblyAngularVelocity = Vector3.zero
-                            end)
-                        end
-                    end
                 end
             end
         end
@@ -5560,10 +5522,8 @@ table.insert(S.Connections, RunService.Heartbeat:Connect(function(dt)
 end))
 
 -- ── 3. Collision Pass loop (Noclip) ───────────────────────────
-local wasNoClip = false
 table.insert(S.Connections, RunService.Stepped:Connect(function()
     if S.NoClip then
-        wasNoClip = true
         local char = getChar()
         if char then
             for _, p in ipairs(char:GetDescendants()) do
@@ -5572,13 +5532,19 @@ table.insert(S.Connections, RunService.Stepped:Connect(function()
                 end
             end
         end
-    elseif wasNoClip then
-        wasNoClip = false
-        local char = getChar()
-        if char then
-            for _, p in ipairs(char:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    p.CanCollide = true
+    end
+    
+    if S.AntiFling then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP and p.Character then
+                for _, part in ipairs(p.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        pcall(function()
+                            part.CanCollide = false
+                            part.AssemblyLinearVelocity = Vector3.zero
+                            part.AssemblyAngularVelocity = Vector3.zero
+                        end)
+                    end
                 end
             end
         end
@@ -5817,4 +5783,4 @@ local toggleKeyName = S.UIToggleKey and S.UIToggleKey.Name or "RCtrl"
 logMessage("System", "WeAreSkidding loaded successfully. Keybind: [" .. toggleKeyName .. "] to toggle UI", Color3.fromRGB(50, 195, 75))
 notify("WeAreSkidding loaded! [" .. toggleKeyName .. "] to toggle UI", Color3.fromRGB(50, 195, 75))
 
-print("[WeAreSkidding] Custom GUI loaded successfully!")
+print("[WeAreSkidding] loaded mf!")
