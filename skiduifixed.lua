@@ -4749,10 +4749,18 @@ function enableGhostMode()
         for _, obj in ipairs(clone:GetDescendants()) do
             if obj:IsA("LuaSourceContainer") or obj:IsA("Script") or obj:IsA("LocalScript") then
                 obj:Destroy()
+            elseif obj:IsA("BodyMover") or obj:IsA("Constraint") or obj:IsA("Attachment") then
+                pcall(function() obj:Destroy() end)
             elseif obj:IsA("BasePart") then
                 obj.Anchored = true
-                obj.CanCollide = false
+                pcall(function() obj.CanCollide = false end)
+                pcall(function() obj.CanTouch = false end)
+                pcall(function() obj.CanQuery = false end)
                 obj.Transparency = 0.5
+            elseif obj:IsA("Humanoid") then
+                obj.PlatformStand = true
+                pcall(function() obj.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end)
+                pcall(function() obj.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff end)
             end
         end
         clone.Parent = Workspace
@@ -5783,4 +5791,4 @@ local toggleKeyName = S.UIToggleKey and S.UIToggleKey.Name or "RCtrl"
 logMessage("System", "WeAreSkidding loaded successfully. Keybind: [" .. toggleKeyName .. "] to toggle UI", Color3.fromRGB(50, 195, 75))
 notify("WeAreSkidding loaded! [" .. toggleKeyName .. "] to toggle UI", Color3.fromRGB(50, 195, 75))
 
-print("[WeAreSkidding] loaded mf!")
+print("[WeAreSkidding] Loaded mf!")
