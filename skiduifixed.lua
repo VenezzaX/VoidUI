@@ -67,7 +67,7 @@ local S = {
     FlySpeed = 60,
     BlinkDistance = 25,
     BlinkDirection = "Camera Look", -- "Camera Look" or "Movement Direction"
-    BlinkKey = Enum.KeyCode.Q,
+    BlinkKey = Enum.KeyCode.Unknown,
     
     GhostMode = false,
     GhostCFrame = nil,
@@ -188,21 +188,30 @@ local S = {
     FavoriteMaps = {},
     
     -- Keybind Mappings (Rebindable)
-    FlyKey = Enum.KeyCode.F,
-    NoClipKey = Enum.KeyCode.N,
-    BHopKey = Enum.KeyCode.B,
-    InfJumpKey = Enum.KeyCode.J,
-    GhostKey = Enum.KeyCode.G,
-    BlinkKey = Enum.KeyCode.Q,
+    FlyKey = Enum.KeyCode.Unknown,
+    NoClipKey = Enum.KeyCode.Unknown,
+    BHopKey = Enum.KeyCode.Unknown,
+    InfJumpKey = Enum.KeyCode.Unknown,
+    GhostKey = Enum.KeyCode.Unknown,
+    BlinkKey = Enum.KeyCode.Unknown,
+    JumpStrengthKey = Enum.KeyCode.Unknown,
 
     -- Theme and HUD Settings
     ThemeColor = "Purple",
     HUDWatermark = true,
     HUDCoords = true,
     HUDArrayList = true,
-    MacroKey = Enum.KeyCode.H,
+    HUDArrayListOutside = true,
+    MacroKey = Enum.KeyCode.Unknown,
     MacroText = "Meteor Client on Top!",
     UIToggleKey = Enum.KeyCode.RightControl,
+    AimbotHoldMode = "M2",
+    AimbotHoldKey = Enum.KeyCode.Unknown,
+    HUDArrayListX = 10,
+    HUDArrayListY = 70,
+    TriggerbotActive = false,
+    TriggerbotTeamCheck = true,
+    TriggerbotDelay = 0.05,
 
     currentOptionsModule = ""
 }
@@ -1336,6 +1345,12 @@ local function loadConfig()
     S.ClickTeleport = false
     S.SprintEnabled = false
     S.GraphicsReducer = false
+    S.ForceWalkSpeed = false
+    S.ForceJumpPower = false
+    if S.HUDWatermark == nil then S.HUDWatermark = true end
+    if S.HUDArrayListOutside == nil then S.HUDArrayListOutside = true end
+    if S.HUDArrayList == nil then S.HUDArrayList = true end
+    if S.HUDCoords == nil then S.HUDCoords = true end
 end
 loadConfig()
 setupAutoRejoin()
@@ -1361,6 +1376,14 @@ end)
 if not screenGui.Parent then
     pcall(function() screenGui.Parent = LP:WaitForChild("PlayerGui") end)
 end
+
+local mainUIContainer = Instance.new("Frame")
+mainUIContainer.Name = "MainUIContainer"
+mainUIContainer.Size = UDim2.new(1, 0, 1, 0)
+mainUIContainer.BackgroundTransparency = 1
+mainUIContainer.BorderSizePixel = 0
+mainUIContainer.Visible = true
+mainUIContainer.Parent = screenGui
 
 -- Theme Color System definitions
 local themeColors = {
@@ -1427,11 +1450,19 @@ local function updateHUDArrayList()
         if child:IsA("TextLabel") then child:Destroy() end
     end
     
-    if not S.HUDArrayList then return end
+    local isVisible = S.HUDArrayList
+    if not uiVisible then
+        isVisible = S.HUDArrayList and S.HUDArrayListOutside
+    end
+
+    if not isVisible then 
+        hudArrayListFrame.Visible = false
+        return 
+    end
     
     local activeMods = {}
     for modName, item in pairs(moduleButtons) do
-        if item.Button.TextColor3 == Color3.fromRGB(100, 240, 100) then
+        if item.IsActive and item.IsActive() then
             table.insert(activeMods, modName)
         end
     end
@@ -1440,25 +1471,37 @@ local function updateHUDArrayList()
         return #a > #b
     end)
     
-    for _, modName in ipairs(activeMods) do
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, 0, 0, 14)
-        lbl.BackgroundTransparency = 1
-        lbl.Font = Enum.Font.GothamBold
-        lbl.TextSize = 10
-        lbl.TextColor3 = currentThemeColor
-        lbl.TextXAlignment = Enum.TextXAlignment.Right
-        lbl.Text = modName .. "   "
-        lbl.Parent = hudArrayListFrame
+    if #activeMods == 0 then
+        hudArrayListFrame.Visible = false
+    else
+        hudArrayListFrame.Visible = isVisible
+        for _, modName in ipairs(activeMods) do
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1, 0, 0, 14)
+            lbl.BackgroundTransparency = 1
+            lbl.Font = Enum.Font.GothamBold
+            lbl.TextSize = 9
+            lbl.TextColor3 = currentThemeColor
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.Text = "  " .. modName
+            lbl.Parent = hudArrayListFrame
 
-        local accent = Instance.new("Frame")
-        accent.Size = UDim2.new(0, 2, 1, 0)
-        accent.Position = UDim2.new(1, -2, 0, 0)
-        accent.BackgroundColor3 = currentThemeColor
-        accent.BorderSizePixel = 0
-        accent.Parent = lbl
+            local accent = Instance.new("Frame")
+            accent.Size = UDim2.new(0, 2, 1, 0)
+            accent.Position = UDim2.new(0, 0, 0, 0)
+            accent.BackgroundColor3 = currentThemeColor
+            accent.BorderSizePixel = 0
+            accent.Parent = lbl
+        end
     end
 end
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        pcall(updateHUDArrayList)
+    end
+end)
 
 local function applyThemeColor(colorName)
     local col = themeColors[colorName] or themeColors["Purple"]
@@ -1496,7 +1539,7 @@ local topBar = Instance.new("Frame")
 topBar.Size = UDim2.new(1, 0, 0, 24)
 topBar.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 topBar.BorderSizePixel = 0
-topBar.Parent = screenGui
+topBar.Parent = mainUIContainer
 
 local topStroke = Instance.new("UIStroke")
 topStroke.Color = Color3.fromRGB(30, 30, 30)
@@ -2142,6 +2185,8 @@ local function addDropdownOption(parent, name, optionsList, defaultValIndex, cal
     }
 end
 
+local keybindRegistry = {}
+
 local function addKeybindOption(parent, name, defaultKey, callback)
     local row = Instance.new("Frame")
     row.Size = UDim2.new(1, 0, 0, 18)
@@ -2167,7 +2212,7 @@ local function addKeybindOption(parent, name, defaultKey, callback)
     bindBtn.Font = Enum.Font.GothamBold
     bindBtn.TextSize = 9
     bindBtn.TextColor3 = currentThemeColor
-    bindBtn.Text = defaultKey and defaultKey.Name or "[none]"
+    bindBtn.Text = (defaultKey and defaultKey ~= Enum.KeyCode.Unknown) and defaultKey.Name or "[none]"
     bindBtn.Parent = row
     table.insert(themeTexts, bindBtn)
 
@@ -2181,7 +2226,23 @@ local function addKeybindOption(parent, name, defaultKey, callback)
 
     addHeaderGradient(bindBtn)
 
+    local currentKey = defaultKey
     local listening = false
+
+    local optObj = {
+        GetKey = function() return currentKey end,
+        SetKey = function(key)
+            currentKey = key
+            bindBtn.Text = (key and key ~= Enum.KeyCode.Unknown) and key.Name or "[none]"
+        end,
+        Set = function(key)
+            currentKey = key
+            bindBtn.Text = (key and key ~= Enum.KeyCode.Unknown) and key.Name or "[none]"
+        end,
+        Callback = callback
+    }
+    keybindRegistry[name] = optObj
+
     bindBtn.MouseButton1Click:Connect(function()
         listening = true
         bindBtn.Text = "..."
@@ -2189,21 +2250,52 @@ local function addKeybindOption(parent, name, defaultKey, callback)
     end)
 
     local con = UserInputService.InputBegan:Connect(function(input)
-        if listening and input.UserInputType == Enum.UserInputType.Keyboard then
-            listening = false
-            local key = input.KeyCode
-            bindBtn.Text = key.Name
-            bindBtn.TextColor3 = currentThemeColor
-            callback(key)
+        if listening then
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                local key = input.KeyCode
+                if key == Enum.KeyCode.Escape then
+                    listening = false
+                    bindBtn.Text = (currentKey and currentKey ~= Enum.KeyCode.Unknown) and currentKey.Name or "[none]"
+                    bindBtn.TextColor3 = currentThemeColor
+                    return
+                elseif key == Enum.KeyCode.Backspace or key == Enum.KeyCode.Delete then
+                    listening = false
+                    currentKey = Enum.KeyCode.Unknown
+                    bindBtn.Text = "[none]"
+                    bindBtn.TextColor3 = currentThemeColor
+                    callback(Enum.KeyCode.Unknown)
+                    return
+                end
+                if UserInputService:GetFocusedTextBox() then return end
+                listening = false
+                currentKey = key
+                bindBtn.Text = (key and key ~= Enum.KeyCode.Unknown) and key.Name or "[none]"
+                bindBtn.TextColor3 = currentThemeColor
+
+                -- Check and unbind duplicates
+                if key ~= Enum.KeyCode.Unknown then
+                    for otherName, otherBind in pairs(keybindRegistry) do
+                        if otherName ~= name and otherBind.GetKey() == key then
+                            otherBind.SetKey(Enum.KeyCode.Unknown)
+                            otherBind.Callback(Enum.KeyCode.Unknown)
+                        end
+                    end
+                end
+
+                callback(key)
+            elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
+                task.wait(0.05)
+                if listening then
+                    listening = false
+                    bindBtn.Text = (currentKey and currentKey ~= Enum.KeyCode.Unknown) and currentKey.Name or "[none]"
+                    bindBtn.TextColor3 = currentThemeColor
+                end
+            end
         end
     end)
     table.insert(S.Connections, con)
 
-    return {
-        Set = function(key)
-            bindBtn.Text = key and key.Name or "[none]"
-        end
-    }
+    return optObj
 end
 
 local function addTextboxOption(parent, name, placeholder, callback)
@@ -2441,8 +2533,6 @@ local function addScrollFeedOption(parent, height)
 end
 
 -- Draggable category windows builder
-local windows = {}
-local moduleButtons = {}
 
 local catPositions = {
     ["Combat"] = 20,
@@ -2467,7 +2557,7 @@ local function getOrCreateWindow(catName, defaultX, defaultY)
     win.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     win.BorderSizePixel = 0
     win.ClipsDescendants = true
-    win.Parent = screenGui
+    win.Parent = mainUIContainer
 
     local winCorner = Instance.new("UICorner")
     winCorner.CornerRadius = UDim.new(0, 6)
@@ -2538,7 +2628,7 @@ local function createFloatingWindow(title, width, height, defaultX, defaultY)
     win.ClipsDescendants = true
     win.Visible = false
     win.ZIndex = 5
-    win.Parent = screenGui
+    win.Parent = mainUIContainer
 
     local winCorner = Instance.new("UICorner")
     winCorner.CornerRadius = UDim.new(0, 6)
@@ -2919,7 +3009,10 @@ local function registerModule(catName, name, defaultX, defaultY, isToggle, defau
         SetActive = function(val)
             active = val
             updateColor()
-        end 
+        end,
+        IsActive = function()
+            return isToggle and active
+        end
     }
 end
 
@@ -3034,6 +3127,7 @@ hudWatermark.TextColor3 = currentThemeColor
 hudWatermark.TextXAlignment = Enum.TextXAlignment.Left
 hudWatermark.Text = "WeAreSkidding <font color='#ffffff'>On Roblox</font>"
 hudWatermark.RichText = true
+hudWatermark.ZIndex = 10
 hudWatermark.Visible = S.HUDWatermark
 hudWatermark.Parent = screenGui
 
@@ -3047,22 +3141,78 @@ hudCoords.TextSize = 10
 hudCoords.TextColor3 = Color3.fromRGB(200, 200, 200)
 hudCoords.TextXAlignment = Enum.TextXAlignment.Left
 hudCoords.Text = "XYZ: 0.0, 0.0, 0.0"
+hudCoords.ZIndex = 10
 hudCoords.Visible = S.HUDCoords
 hudCoords.Parent = screenGui
 
 -- HUD ArrayList setup
 hudArrayListFrame = Instance.new("Frame")
-hudArrayListFrame.Size = UDim2.new(0, 200, 0, 400)
-hudArrayListFrame.Position = UDim2.new(1, -205, 0, 30)
-hudArrayListFrame.BackgroundTransparency = 1
+hudArrayListFrame.Size = UDim2.new(0, 120, 0, 0)
+hudArrayListFrame.Position = UDim2.new(0, S.HUDArrayListX or 10, 0, S.HUDArrayListY or 70)
+hudArrayListFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+hudArrayListFrame.BackgroundTransparency = 0.85
 hudArrayListFrame.BorderSizePixel = 0
+hudArrayListFrame.Active = true
+hudArrayListFrame.ZIndex = 10
+hudArrayListFrame.AutomaticSize = Enum.AutomaticSize.Y
+hudArrayListFrame.Visible = S.HUDArrayList
 hudArrayListFrame.Parent = screenGui
 
+local hudCorner = Instance.new("UICorner")
+hudCorner.CornerRadius = UDim.new(0, 4)
+hudCorner.Parent = hudArrayListFrame
+
+local hudStroke = Instance.new("UIStroke")
+hudStroke.Color = Color3.fromRGB(45, 45, 45)
+hudStroke.Thickness = 1
+hudStroke.Parent = hudArrayListFrame
+
+local hudPadding = Instance.new("UIPadding")
+hudPadding.PaddingTop = UDim.new(0, 4)
+hudPadding.PaddingBottom = UDim.new(0, 4)
+hudPadding.PaddingLeft = UDim.new(0, 4)
+hudPadding.PaddingRight = UDim.new(0, 4)
+hudPadding.Parent = hudArrayListFrame
+
 local arrayLayout = Instance.new("UIListLayout")
-arrayLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+arrayLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 arrayLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 arrayLayout.Padding = UDim.new(0, 2)
 arrayLayout.Parent = hudArrayListFrame
+
+-- Dragging logic
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+hudArrayListFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = hudArrayListFrame.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+                S.HUDArrayListX = hudArrayListFrame.Position.X.Offset
+                S.HUDArrayListY = hudArrayListFrame.Position.Y.Offset
+                saveConfig()
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        hudArrayListFrame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
 
 -- Drag Panels creation helper
 local function createPanel(title, width, height)
@@ -3073,7 +3223,7 @@ local function createPanel(title, width, height)
     win.BorderSizePixel = 0
     win.ClipsDescendants = true
     win.Visible = false
-    win.Parent = screenGui
+    win.Parent = mainUIContainer
 
     local winCorner = Instance.new("UICorner")
     winCorner.CornerRadius = UDim.new(0, 6)
@@ -3310,6 +3460,11 @@ addToggleOption(settingsContent, "Display Active ArrayList", S.HUDArrayList, fun
     updateHUDArrayList()
     saveConfig()
 end)
+addToggleOption(settingsContent, "Display active mods when outside of the main UI", S.HUDArrayListOutside, function(v)
+    S.HUDArrayListOutside = v
+    updateHUDArrayList()
+    saveConfig()
+end)
 
 -- Section 3: Targets & Input Settings
 addSectionHeader(settingsContent, "Targets & Input Settings")
@@ -3438,7 +3593,7 @@ end)
 
 registerModule("Combat", "Aimbot", 20, 50, true, S.AimbotActive, function(v)
     S.AimbotActive = v
-    notify("Aimbot " .. (v and "Enabled (Hold Right Click)" or "Disabled"), Color3.fromRGB(50, 195, 75))
+    notify("Aimbot " .. (v and "Enabled" or "Disabled"), Color3.fromRGB(50, 195, 75))
     saveConfig()
 end, function(drawer)
     addToggleOption(drawer, "Aimbot Team Check", S.AimbotTeamCheck, function(v)
@@ -3463,6 +3618,29 @@ end, function(drawer)
     end)
     addDropdownOption(drawer, "Locked Target Part", {"Head", "Torso", "Random"}, table.find({"Head", "Torso", "Random"}, S.AimbotPart) or 1, function(_, opt)
         S.AimbotPart = opt
+        saveConfig()
+    end)
+    addDropdownOption(drawer, "Aimbot Hold Mode", {"M2", "Keyboard"}, S.AimbotHoldMode == "Keyboard" and 2 or 1, function(_, opt)
+        S.AimbotHoldMode = opt
+        saveConfig()
+    end)
+    addKeybindOption(drawer, "Aimbot Hold Key", S.AimbotHoldKey, function(k)
+        S.AimbotHoldKey = k
+        saveConfig()
+    end)
+end, false)
+
+registerModule("Combat", "Triggerbot", 20, 50, true, S.TriggerbotActive, function(v)
+    S.TriggerbotActive = v
+    notify("Triggerbot " .. (v and "Enabled" or "Disabled"), Color3.fromRGB(50, 195, 75))
+    saveConfig()
+end, function(drawer)
+    addToggleOption(drawer, "Triggerbot Team Check", S.TriggerbotTeamCheck, function(v)
+        S.TriggerbotTeamCheck = v
+        saveConfig()
+    end)
+    addSliderOption(drawer, "Triggerbot Delay (ms)", 0, 500, math.round((S.TriggerbotDelay or 0.05) * 1000), function(v)
+        S.TriggerbotDelay = v / 1000
         saveConfig()
     end)
 end, false)
@@ -3812,13 +3990,15 @@ registerModule("Movement", "Speed Modification", 300, 50, true, S.ForceWalkSpeed
 end, function(drawer)
     addSliderOption(drawer, "WalkSpeed Speed", 16, 250, S.WalkSpeed, function(v)
         S.WalkSpeed = v
-        local hum = getHum()
-        if hum then hum.WalkSpeed = v end
         saveConfig()
+        local hum = getHum()
+        if hum and S.ForceWalkSpeed then hum.WalkSpeed = v end
     end)
     addToggleOption(drawer, "Always Enforce WalkSpeed", S.ForceWalkSpeed, function(v)
         S.ForceWalkSpeed = v
         saveConfig()
+        local hum = getHum()
+        if hum then hum.WalkSpeed = v and S.WalkSpeed or gameDefaultSpeed end
     end)
 end, false)
 
@@ -3840,22 +4020,41 @@ registerModule("Movement", "Jump Hack Strength", 300, 50, true, S.ForceJumpPower
     S.ForceJumpPower = v
     local hum = getHum()
     if hum then
-        hum.UseJumpPower = true
-        hum.JumpPower = v and S.JumpPower or 50
+        if v then
+            hum.UseJumpPower = true
+            hum.JumpPower = S.JumpPower
+        else
+            hum.UseJumpPower = gameDefaultUseJumpPower
+            hum.JumpPower = gameDefaultJumpPower
+        end
     end
     saveConfig()
 end, function(drawer)
     addSliderOption(drawer, "JumpPower Strength", 50, 350, S.JumpPower, function(v)
         S.JumpPower = v
+        saveConfig()
         local hum = getHum()
-        if hum then
+        if hum and S.ForceJumpPower then
             hum.UseJumpPower = true
             hum.JumpPower = v
         end
-        saveConfig()
     end)
     addToggleOption(drawer, "Always Enforce JumpPower", S.ForceJumpPower, function(v)
         S.ForceJumpPower = v
+        saveConfig()
+        local hum = getHum()
+        if hum then
+            if v then
+                hum.UseJumpPower = true
+                hum.JumpPower = S.JumpPower
+            else
+                hum.UseJumpPower = gameDefaultUseJumpPower
+                hum.JumpPower = gameDefaultJumpPower
+            end
+        end
+    end)
+    addKeybindOption(drawer, "Jump Strength Bind", S.JumpStrengthKey, function(k)
+        S.JumpStrengthKey = k
         saveConfig()
     end)
 end, false)
@@ -4730,6 +4929,7 @@ registerModule("Misc", "Settings & Keybinds", 720, 50, false, false, nil, functi
     addKeybindOption(drawer, "InfJump Bind", S.InfJumpKey, function(k) S.InfJumpKey = k saveConfig() end)
     addKeybindOption(drawer, "Ghost Bind", S.GhostKey, function(k) S.GhostKey = k saveConfig() end)
     addKeybindOption(drawer, "Blink Bind", S.BlinkKey, function(k) S.BlinkKey = k saveConfig() end)
+    addKeybindOption(drawer, "JumpStrength Bind", S.JumpStrengthKey, function(k) S.JumpStrengthKey = k saveConfig() end)
 end, false)
 
 -- ──────────────────────────────────────────────────────────────
@@ -4968,6 +5168,7 @@ end
 -- ──────────────────────────────────────────────────────────────
 
 -- ── 1. RenderStepped Aimbot, FOV, and ESP Update ───────────────
+local lastTriggerFire = 0
 local fovCircle = Drawing.new("Circle")
 fovCircle.Thickness = 1
 fovCircle.Color = Color3.fromRGB(218, 38, 38)
@@ -4988,7 +5189,16 @@ table.insert(S.Connections, RunService.RenderStepped:Connect(function()
         fovCircle.Radius = S.AimbotFOV
     end
     
-    if S.AimbotActive and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+    local aimbotPressed = false
+    if S.AimbotHoldMode == "Keyboard" then
+        if S.AimbotHoldKey and S.AimbotHoldKey ~= Enum.KeyCode.Unknown then
+            aimbotPressed = UserInputService:IsKeyDown(S.AimbotHoldKey)
+        end
+    else
+        aimbotPressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+    end
+
+    if S.AimbotActive and aimbotPressed then
         local targetPart = getAimbotTarget()
         if targetPart then
             local goalCF = CFrame.new(Camera.CFrame.Position, targetPart.Position)
@@ -4996,6 +5206,53 @@ table.insert(S.Connections, RunService.RenderStepped:Connect(function()
             Camera.CFrame = Camera.CFrame:Lerp(goalCF, 1 / sm)
         end
     end
+
+    pcall(function()
+        if S.TriggerbotActive and not UserInputService:GetFocusedTextBox() then
+            local target = Mouse.Target
+            if target then
+                local current = target
+                local char = nil
+                local hum = nil
+                while current and current ~= game do
+                    if current:IsA("Model") then
+                        local h = current:FindFirstChildOfClass("Humanoid")
+                        if h then
+                            char = current
+                            hum = h
+                            break
+                        end
+                    end
+                    current = current.Parent
+                end
+                if hum and hum.Health > 0 and char then
+                    local p = Players:GetPlayerFromCharacter(char)
+                    if p and p ~= LP then
+                        if not S.TriggerbotTeamCheck or p.Team ~= LP.Team then
+                            local now = tick()
+                            if not lastTriggerFire or (now - lastTriggerFire) >= (S.TriggerbotDelay or 0.05) then
+                                lastTriggerFire = now
+                                pcall(function()
+                                    if mouse1press and mouse1release then
+                                        task.spawn(function()
+                                            mouse1press()
+                                            task.wait(0.01)
+                                            mouse1release()
+                                        end)
+                                    elseif mouse1click then
+                                        mouse1click()
+                                    else
+                                        VirtualUser:CaptureController()
+                                        VirtualUser:ClickButton1(Vector2.new(Mouse.X, Mouse.Y))
+                                    end
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
     
     local espColorMapping = {
         ["Red"] = Color3.fromRGB(220, 40, 40),
@@ -5562,7 +5819,8 @@ end))
 -- ── 4. User Inputs (Keybinds) ─────────────────────────────────
 local function toggleUIVisibility()
     uiVisible = not uiVisible
-    screenGui.Enabled = uiVisible
+    mainUIContainer.Visible = uiVisible
+    updateHUDArrayList()
     if updateMenuBlur then updateMenuBlur() end
 end
 
@@ -5593,10 +5851,12 @@ table.insert(S.Connections, UserInputService.InputBegan:Connect(function(inp, gp
         end
     end
     
+    if UserInputService:GetFocusedTextBox() then return end
     if inp.UserInputType ~= Enum.UserInputType.Keyboard then return end
     local k = inp.KeyCode
+    if k == Enum.KeyCode.Unknown then return end
     
-    if k == (S.MacroKey or Enum.KeyCode.H) and S.MacroText and S.MacroText ~= "" then
+    if S.MacroKey and S.MacroKey ~= Enum.KeyCode.Unknown and k == S.MacroKey and S.MacroText and S.MacroText ~= "" then
         pcall(function()
             local chatService = game:GetService("TextChatService")
             if chatService and chatService.ChatVersion == Enum.ChatVersion.TextChatService then
@@ -5621,33 +5881,49 @@ table.insert(S.Connections, UserInputService.InputBegan:Connect(function(inp, gp
                 hum.WalkSpeed = S.SprintSpeed
             end
         end
-    elseif k == S.FlyKey then
+    elseif S.FlyKey and S.FlyKey ~= Enum.KeyCode.Unknown and k == S.FlyKey then
         S.Fly = not S.Fly
         if S.Fly then flyOn() else flyOff() end
         notify("Fly Mode " .. (S.Fly and "ON" or "OFF"), Color3.fromRGB(218, 170, 42))
         local mod = moduleButtons["Fly Mode"]
         if mod then mod.SetActive(S.Fly) end
-    elseif k == S.NoClipKey then
+    elseif S.NoClipKey and S.NoClipKey ~= Enum.KeyCode.Unknown and k == S.NoClipKey then
         S.NoClip = not S.NoClip
         notify("NoClip " .. (S.NoClip and "ON" or "OFF"), Color3.fromRGB(218, 170, 42))
         local mod = moduleButtons["NoClip Passes"]
         if mod then mod.SetActive(S.NoClip) end
-    elseif k == S.BHopKey then
+    elseif S.BHopKey and S.BHopKey ~= Enum.KeyCode.Unknown and k == S.BHopKey then
         S.BHop = not S.BHop
         notify("Bunnyhop " .. (S.BHop and "ON" or "OFF"), Color3.fromRGB(218, 170, 42))
         local mod = moduleButtons["Auto Bunnyhop"]
         if mod then mod.SetActive(S.BHop) end
-    elseif k == S.InfJumpKey then
+    elseif S.InfJumpKey and S.InfJumpKey ~= Enum.KeyCode.Unknown and k == S.InfJumpKey then
         S.InfJump = not S.InfJump
         notify("Infinite Jump " .. (S.InfJump and "ON" or "OFF"), Color3.fromRGB(218, 170, 42))
         local mod = moduleButtons["Infinite Jump"]
         if mod then mod.SetActive(S.InfJump) end
-    elseif k == S.GhostKey then
+    elseif S.JumpStrengthKey and S.JumpStrengthKey ~= Enum.KeyCode.Unknown and k == S.JumpStrengthKey then
+        S.ForceJumpPower = not S.ForceJumpPower
+        local hum = getHum()
+        if hum then
+            if S.ForceJumpPower then
+                hum.UseJumpPower = true
+                hum.JumpPower = S.JumpPower
+            else
+                hum.UseJumpPower = gameDefaultUseJumpPower
+                hum.JumpPower = gameDefaultJumpPower
+            end
+        end
+        notify("Jump Strength " .. (S.ForceJumpPower and "ON" or "OFF"), Color3.fromRGB(218, 170, 42))
+        local mod = moduleButtons["Jump Hack Strength"]
+        if mod then mod.SetActive(S.ForceJumpPower) end
+        saveConfig()
+    elseif S.GhostKey and S.GhostKey ~= Enum.KeyCode.Unknown and k == S.GhostKey then
         S.GhostMode = not S.GhostMode
         if S.GhostMode then enableGhostMode() else disableGhostMode() end
         local mod = moduleButtons["Ghost State Mode"]
         if mod then mod.SetActive(S.GhostMode) end
-    elseif k == S.BlinkKey then
+    elseif S.BlinkKey and S.BlinkKey ~= Enum.KeyCode.Unknown and k == S.BlinkKey then
         local hrp = getHRP()
         local hum = getHum()
         if hrp and hum then
@@ -5791,4 +6067,4 @@ local toggleKeyName = S.UIToggleKey and S.UIToggleKey.Name or "RCtrl"
 logMessage("System", "WeAreSkidding loaded successfully. Keybind: [" .. toggleKeyName .. "] to toggle UI", Color3.fromRGB(50, 195, 75))
 notify("WeAreSkidding loaded! [" .. toggleKeyName .. "] to toggle UI", Color3.fromRGB(50, 195, 75))
 
-print("[WeAreSkidding] Loaded mf!")
+print("[WeAreSkidding] Custom GUI loaded successfully!")
