@@ -578,19 +578,71 @@ local function setupAutoRejoin()
 end
 
 local queue_on_teleport = queue_on_teleport or queueteleport or (syn and syn.queue_on_teleport) or queue_to_teleport or (fluxus and fluxus.queue_on_teleport)
+
+
+
 local function setupAutoReinject()
+
+    -- Ensure your configuration table 'S' exists before checking it
+
+    if not S or not S.AutoReinject then return end
+
+
+
+    -- The code that will execute in the next game instance
+
     local code = [[
+
         repeat task.wait() until game:IsLoaded()
+
+        
+
+        -- Fallback check for file functions
+
         local start = tick()
-        repeat task.wait(0.1) until (isfile and readfile) or (tick() - start > 10)
+
+        repeat task.wait(0.1) until (isfile and readfile) or (tick() - start > 5)
+
+        
+
         if isfile and isfile("Script.lua") then
-            loadstring(readfile("Script.lua"))()
+
+            local success, err = pcall(function()
+
+                loadstring(readfile("Script.lua"))()
+
+            end)
+
+            if not success then warn("Failed to load local script: " .. tostring(err)) end
+
+        else
+
+            local success, err = pcall(function()
+
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/VenezzaX/VoidUI/refs/heads/main/SkiddedUI.lua"))()
+
+            end)
+
+            if not success then warn("Failed to load remote script: " .. tostring(err)) end
+
         end
+
     ]]
-    if S.AutoReinject then
-        if queue_on_teleport then pcall(queue_on_teleport, code) end
-        if writefile then pcall(writefile, "autoexec/VoidUtilityHub.lua", code) end
+
+    if queue_on_teleport then 
+
+        pcall(queue_on_teleport, code) 
+
     end
+
+    
+
+    if writefile then 
+
+        pcall(writefile, "autoexec/VoidUtilityHub.lua", code) 
+
+    end
+
 end
 
 local function teleportToPlace(placeId)
