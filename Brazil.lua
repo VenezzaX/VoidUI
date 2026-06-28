@@ -412,7 +412,7 @@ toggleGraphicsReducer = function(v)
 end
 
 local rejoinHooked = false
-local function setupAutoRejoin()
+local function setupAutoRejoin()https://github.com/VenezzaX/VoidUI/blob/main/Brazil.lua
     if rejoinHooked then return end; rejoinHooked = true
     pcall(function()
         local conn = game:GetService("GuiService").ErrorMessageChanged:Connect(function()
@@ -426,11 +426,24 @@ local function setupAutoRejoin()
 end
 
 local queue_on_teleport = queue_on_teleport or queueteleport or (syn and syn.queue_on_teleport) or queue_to_teleport or (fluxus and fluxus.queue_on_teleport)
+
 local function setupAutoReinject()
-    local code = [[ repeat task.wait() until game:IsLoaded() local start = tick() repeat task.wait(0.1) until (isfile and readfile) or (tick() - start > 10) if isfile and isfile("Script.lua") then loadstring(readfile("Script.lua"))() end ]]
+    -- This is the code that executes immediately after you teleport
+    local code = [[ 
+        repeat task.wait() until game:IsLoaded() 
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/VenezzaX/VoidUI/refs/heads/main/Brazil.lua"))() 
+    ]]
+    
     if S.AutoReinject then
-        if queue_on_teleport then pcall(queue_on_teleport, code) end
-        if writefile then pcall(writefile, "autoexec/VoidUtilityHub.lua", code) end
+        -- 1. Queues the code to run on the next server you teleport to
+        if queue_on_teleport then 
+            pcall(queue_on_teleport, code) 
+        end
+        
+        -- 2. Saves it to autoexec so it runs even if you completely restart the game
+        if writefile then 
+            pcall(writefile, "autoexec/VoidUtilityHub.lua", code) 
+        end
     end
 end
 
