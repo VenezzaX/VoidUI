@@ -412,7 +412,7 @@ toggleGraphicsReducer = function(v)
 end
 
 local rejoinHooked = false
-local function setupAutoRejoin()https://github.com/VenezzaX/VoidUI/blob/main/Brazil.lua
+local function setupAutoRejoin()
     if rejoinHooked then return end; rejoinHooked = true
     pcall(function()
         local conn = game:GetService("GuiService").ErrorMessageChanged:Connect(function()
